@@ -1,0 +1,13 @@
+/* Created by mdot for Matlab */
+digraph m2html {
+  LEfe2dpe -> dershapefunc2D;
+  LEfe2dpe -> setupmesh;
+  setupmesh -> formCoord3NT;
+
+  LEfe2dpe [URL="LEfePE/LEfe2dpe.html"];
+  dershapefunc2D [URL="LEfePE/functions/dershapefunc2D.html"];
+  formCoord3NT [URL="LEfePE/functions/formCoord3NT.html"];
+  formCoord4NQ [URL="LEfePE/functions/formCoord4NQ.html"];
+  formCoord8NQ [URL="LEfePE/functions/formCoord8NQ.html"];
+  setupmesh [URL="LEfePE/setupmesh.html"];
+}

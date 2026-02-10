@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+  <title>Description of setupmesh</title>
+  <meta name="keywords" content="setupmesh">
+  <meta name="description" content="Mesh and material information">
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <meta name="generator" content="m2html v1.5 &copy; 2003-2005 Guillaume Flandin">
+  <meta name="robots" content="index, follow">
+  <link type="text/css" rel="stylesheet" href="../m2html.css">
+</head>
+<body>
+<a name="_top"></a>
+<div><a href="../menu.html">Home</a> &gt;  <a href="menu.html">LEfePE</a> &gt; setupmesh.m</div>
+
+<!--<table width="100%"><tr><td align="left"><a href="../menu.html"><img alt="<" border="0" src="../left.png">&nbsp;Master index</a></td>
+<td align="right"><a href="menu.html">Index for LEfePE&nbsp;<img alt=">" border="0" src="../right.png"></a></td></tr></table>-->
+
+<h1>setupmesh
+</h1>
+
+<h2><a name="_name"></a>PURPOSE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong>Mesh and material information</strong></div>
+
+<h2><a name="_synopsis"></a>SYNOPSIS <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="box"><strong>function [coord,etpl,fext,bc,ngp,E,v]=setupmesh </strong></div>
+
+<h2><a name="_description"></a>DESCRIPTION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre class="comment">Mesh and material information
+--------------------------------------------------------------------------
+ Author: William Coombs
+ Date:   30/09/2020
+ Description:
+ Function to provide the finite element mesh information (such as nodal
+ positions and mesh connectivity), the boundary conditions on the mesh and
+ the properties of the analysed material. 
+
+--------------------------------------------------------------------------
+ [coord,etpl,fext,bc,E,v,ngp,dens,sf] = SETUPMESH
+--------------------------------------------------------------------------
+ Input(s):
+ 
+--------------------------------------------------------------------------
+ Ouput(s);
+ coord   - nodal coordiantes (nodes,nD)
+ etpl    - element connectivity (nels,nen)
+ fext    - external force vector (nodes*nD,1)
+ bc      - boundary condition matrix (*,2)
+ ngp     - number of Gauss points per element
+ E       - Young's modulus 
+ v       - Poission's ratio
+--------------------------------------------------------------------------
+ See also:
+ FORMCOORD4NQ  - 4-noded element mesh generation
+ FORMCOORD8NQ  - 8-noded element mesh generation
+--------------------------------------------------------------------------</pre></div>
+
+<!-- crossreference -->
+<h2><a name="_cross"></a>CROSS-REFERENCE INFORMATION <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+This function calls:
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="../LEfePE/functions/formCoord3NT.html" class="code" title="function [etpl,coord]=formCoord3NT(nelsx,nelsy,lx,ly)">formCoord3NT</a>	Two dimensional finite element mesh generation</li></ul>
+This function is called by:
+<ul style="list-style-image:url(../matlabicon.gif)">
+<li><a href="LEfe2dpe.html" class="code" title="">LEfe2dpe</a>	LEfe2dpe: 2D plane strain Linear Elastic finite element solver</li></ul>
+<!-- crossreference -->
+
+
+
+<h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../up.png"></a></h2>
+<div class="fragment"><pre>0001 <a name="_sub0" href="#_subfunctions" class="code">function [coord,etpl,fext,bc,ngp,E,v]=setupmesh</a>
+0002 
+0003 <span class="comment">%Mesh and material information</span>
+0004 <span class="comment">%--------------------------------------------------------------------------</span>
+0005 <span class="comment">% Author: William Coombs</span>
+0006 <span class="comment">% Date:   30/09/2020</span>
+0007 <span class="comment">% Description:</span>
+0008 <span class="comment">% Function to provide the finite element mesh information (such as nodal</span>
+0009 <span class="comment">% positions and mesh connectivity), the boundary conditions on the mesh and</span>
+0010 <span class="comment">% the properties of the analysed material.</span>
+0011 <span class="comment">%</span>
+0012 <span class="comment">%--------------------------------------------------------------------------</span>
+0013 <span class="comment">% [coord,etpl,fext,bc,E,v,ngp,dens,sf] = SETUPMESH</span>
+0014 <span class="comment">%--------------------------------------------------------------------------</span>
+0015 <span class="comment">% Input(s):</span>
+0016 <span class="comment">%</span>
+0017 <span class="comment">%--------------------------------------------------------------------------</span>
+0018 <span class="comment">% Ouput(s);</span>
+0019 <span class="comment">% coord   - nodal coordiantes (nodes,nD)</span>
+0020 <span class="comment">% etpl    - element connectivity (nels,nen)</span>
+0021 <span class="comment">% fext    - external force vector (nodes*nD,1)</span>
+0022 <span class="comment">% bc      - boundary condition matrix (*,2)</span>
+0023 <span class="comment">% ngp     - number of Gauss points per element</span>
+0024 <span class="comment">% E       - Young's modulus</span>
+0025 <span class="comment">% v       - Poission's ratio</span>
+0026 <span class="comment">%--------------------------------------------------------------------------</span>
+0027 <span class="comment">% See also:</span>
+0028 <span class="comment">% FORMCOORD4NQ  - 4-noded element mesh generation</span>
+0029 <span class="comment">% FORMCOORD8NQ  - 8-noded element mesh generation</span>
+0030 <span class="comment">%--------------------------------------------------------------------------</span>
+0031 
+0032 
+0033 lx    = 1;                                                                  <span class="comment">% mesh length in the x direction</span>
+0034 ly    = 1;                                                                  <span class="comment">% mesh length in the y direction</span>
+0035 nelsx = 1;                                                                  <span class="comment">% number of elements in the x direction</span>
+0036 nelsy = 1;                                                                  <span class="comment">% number of elements in the y direction</span>
+0037 
+0038 maxLoad = 2e3;                                                              <span class="comment">% applied force</span>
+0039 E       = 1;                                                                <span class="comment">% Young's modulus</span>
+0040 v       = 0.2;                                                              <span class="comment">% Poisson's ratio</span>
+0041 ngp     = 4;                                                                <span class="comment">% number of Gauss points</span>
+0042 
+0043 [etpl,coord] = <a href="../LEfePE/functions/formCoord3NT.html" class="code" title="function [etpl,coord]=formCoord3NT(nelsx,nelsy,lx,ly)">formCoord3NT</a>(nelsx,nelsy,lx,ly);                             <span class="comment">% mesh generation (LINEAR TRIANGLE)</span>
+0044 <span class="comment">% [etpl,coord] = formCoord4NQ(nelsx,nelsy,lx,ly);                             % mesh generation (LINEAR QUAD)</span>
+0045 <span class="comment">% [etpl,coord] = formCoord8NQ(nelsx,nelsy,lx,ly);                             % mesh generation (QUADRATIC QUAD)</span>
+0046 
+0047 [nodes,nD] = size(coord);                                                   <span class="comment">% number of nodes and dimensions</span>
+0048 
+0049 tol=1e-6; bc=zeros(nodes*nD,2);                                             <span class="comment">% boundary conditions</span>
+0050 <span class="keyword">for</span> i=1:nodes
+0051   <span class="keyword">if</span> coord(i,1)&lt;tol; bc(i*2-1,1)=i*2-1; <span class="keyword">end</span>
+0052   <span class="keyword">if</span> coord(i,2)&lt;tol; bc(i*2  ,1)=i*2; <span class="keyword">end</span>   
+0053 <span class="keyword">end</span>
+0054 bc=sortrows(bc,1);                                                     
+0055 bc=bc(bc(:,1)&gt;0,:);                                                         <span class="comment">% remove excess rows from bc</span>
+0056 
+0057 fext=zeros(nodes*nD,1);                                                     <span class="comment">% external force vector</span>
+0058 fext(end)=maxLoad; 
+0059 
+0060 <span class="keyword">end</span></pre></div>
+<hr><address>Generated on Thu 12-Nov-2020 10:12:47 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" title="Matlab Documentation in HTML">m2html</a></strong> &copy; 2005</address>
+</body>
+</html>

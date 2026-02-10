@@ -1,0 +1,143 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+                "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+  <title>Description of formCoord8NQ</title>
+  <meta name="keywords" content="formCoord8NQ">
+  <meta name="description" content="Two dimensional finite element grid generation">
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <meta name="generator" content="m2html v1.5 &copy; 2003-2005 Guillaume Flandin">
+  <meta name="robots" content="index, follow">
+  <link type="text/css" rel="stylesheet" href="../../m2html.css">
+</head>
+<body>
+<a name="_top"></a>
+<div><a href="../../menu.html">Home</a> &gt;  <a href="../menu.html">LEfePE</a> &gt; <a href="menu.html">functions</a> &gt; formCoord8NQ.m</div>
+
+<!--<table width="100%"><tr><td align="left"><a href="../../menu.html"><img alt="<" border="0" src="../../left.png">&nbsp;Master index</a></td>
+<td align="right"><a href="menu.html">Index for LEfePE/functions&nbsp;<img alt=">" border="0" src="../../right.png"></a></td></tr></table>-->
+
+<h1>formCoord8NQ
+</h1>
+
+<h2><a name="_name"></a>PURPOSE <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="box"><strong>Two dimensional finite element grid generation</strong></div>
+
+<h2><a name="_synopsis"></a>SYNOPSIS <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="box"><strong>function [etopol,coord]=formCoord8NQ(nelsx,nelsy,lx,ly) </strong></div>
+
+<h2><a name="_description"></a>DESCRIPTION <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="fragment"><pre class="comment">Two dimensional finite element grid generation
+--------------------------------------------------------------------------
+ Author: William Coombs
+ Date:   06/05/2015
+ Description:
+ Function to generate a 2D finite element grid of quadratic quadrilateral 
+ elements.
+
+--------------------------------------------------------------------------
+ [etpl,coord] = FORMCOORD8NQ(nelsx,nelsy,lx,ly)
+--------------------------------------------------------------------------
+ Input(s):
+ nelsx - number of elements in the x direction
+ nelsy - number of elements in the y direction
+ lx    - length in the x direction
+ ly    - length in the y direction
+--------------------------------------------------------------------------
+ Ouput(s);
+ etpl  - element topology
+ coord - nodal coordinates
+--------------------------------------------------------------------------
+ See also:
+
+--------------------------------------------------------------------------</pre></div>
+
+<!-- crossreference -->
+<h2><a name="_cross"></a>CROSS-REFERENCE INFORMATION <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+This function calls:
+<ul style="list-style-image:url(../../matlabicon.gif)">
+</ul>
+This function is called by:
+<ul style="list-style-image:url(../../matlabicon.gif)">
+</ul>
+<!-- crossreference -->
+
+<h2><a name="_subfunctions"></a>SUBFUNCTIONS <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<ul style="list-style-image:url(../../matlabicon.gif)">
+<li><a href="#_sub1" class="code">function [oddeven]=oddeve(number)</a></li></ul>
+
+<h2><a name="_source"></a>SOURCE CODE <a href="#_top"><img alt="^" border="0" src="../../up.png"></a></h2>
+<div class="fragment"><pre>0001 <a name="_sub0" href="#_subfunctions" class="code">function [etopol,coord]=formCoord8NQ(nelsx,nelsy,lx,ly)</a>
+0002 
+0003 <span class="comment">%Two dimensional finite element grid generation</span>
+0004 <span class="comment">%--------------------------------------------------------------------------</span>
+0005 <span class="comment">% Author: William Coombs</span>
+0006 <span class="comment">% Date:   06/05/2015</span>
+0007 <span class="comment">% Description:</span>
+0008 <span class="comment">% Function to generate a 2D finite element grid of quadratic quadrilateral</span>
+0009 <span class="comment">% elements.</span>
+0010 <span class="comment">%</span>
+0011 <span class="comment">%--------------------------------------------------------------------------</span>
+0012 <span class="comment">% [etpl,coord] = FORMCOORD8NQ(nelsx,nelsy,lx,ly)</span>
+0013 <span class="comment">%--------------------------------------------------------------------------</span>
+0014 <span class="comment">% Input(s):</span>
+0015 <span class="comment">% nelsx - number of elements in the x direction</span>
+0016 <span class="comment">% nelsy - number of elements in the y direction</span>
+0017 <span class="comment">% lx    - length in the x direction</span>
+0018 <span class="comment">% ly    - length in the y direction</span>
+0019 <span class="comment">%--------------------------------------------------------------------------</span>
+0020 <span class="comment">% Ouput(s);</span>
+0021 <span class="comment">% etpl  - element topology</span>
+0022 <span class="comment">% coord - nodal coordinates</span>
+0023 <span class="comment">%--------------------------------------------------------------------------</span>
+0024 <span class="comment">% See also:</span>
+0025 <span class="comment">%</span>
+0026 <span class="comment">%--------------------------------------------------------------------------</span>
+0027 
+0028 nels=nelsx*nelsy;
+0029 nnodesxO = (2*nelsx)+1;
+0030 nnodesxE =   nelsx +1;
+0031 nodes    = nnodesxO*(nelsy+1) + nnodesxE*nelsy;
+0032 node=0; elem=0;
+0033 
+0034 coord = zeros(nodes,2);
+0035 <span class="keyword">for</span> ylayr=1:(2*nelsy+1)
+0036   y=(ylayr-1)*ly/(2*nelsy);
+0037   <span class="keyword">for</span> xlayr=1:(2*nelsx+1)
+0038     x=(xlayr-1)*lx/(2*nelsx);
+0039     <span class="keyword">if</span>(<a href="#_sub1" class="code" title="subfunction [oddeven]=oddeve(number)">oddeve</a>(ylayr)==1)
+0040       node=node+1;
+0041       coord(node,1:2)=[x y];
+0042     <span class="keyword">elseif</span>((((<a href="#_sub1" class="code" title="subfunction [oddeven]=oddeve(number)">oddeve</a>(ylayr)==0))||((<a href="#_sub1" class="code" title="subfunction [oddeven]=oddeve(number)">oddeve</a>(ylayr)==1)))&amp;&amp;(<a href="#_sub1" class="code" title="subfunction [oddeven]=oddeve(number)">oddeve</a>(xlayr)==1))
+0043       node=node+1;
+0044       coord(node,1:2)=[x y];
+0045     <span class="keyword">end</span>
+0046   <span class="keyword">end</span>
+0047 <span class="keyword">end</span>
+0048 etopol=zeros(nels,8);
+0049 <span class="keyword">for</span> elemy=1:nelsy
+0050   <span class="keyword">for</span> elemx=1:nelsx
+0051       elem=elem+1;
+0052       n1=((elemy-1)*(nnodesxO+nnodesxE))+(2*(elemx-1))+1;
+0053       n2=(nnodesxO)*elemy+(nnodesxE)*(elemy-1)+elemx;
+0054       n3=(nnodesxO+nnodesxE)*elemy+(elemx-1)*2+1;
+0055       n4=n3+1;
+0056       n5=n4+1;
+0057       n6=n2+1;
+0058       n7=n1+2;
+0059       n8=n1+1;
+0060       etopol(elem,1:8)=[n1 n2 n3 n4 n5 n6 n7 n8];
+0061   <span class="keyword">end</span>
+0062 <span class="keyword">end</span>
+0063 <span class="keyword">end</span>
+0064 
+0065 <a name="_sub1" href="#_subfunctions" class="code">function [oddeven]=oddeve(number)</a>
+0066 <span class="keyword">if</span> ((number/2)~=(floor(number/2)))
+0067   oddeven=1; <span class="comment">% odd</span>
+0068 <span class="keyword">else</span>
+0069   oddeven=0; <span class="comment">% even</span>
+0070 <span class="keyword">end</span>
+0071 <span class="keyword">end</span></pre></div>
+<hr><address>Generated on Thu 12-Nov-2020 10:12:47 by <strong><a href="http://www.artefact.tk/software/matlab/m2html/" title="Matlab Documentation in HTML">m2html</a></strong> &copy; 2005</address>
+</body>
+</html>
