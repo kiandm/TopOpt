@@ -10,6 +10,6 @@ BCs_xy = [
      240
      ];
 
-loads_xy = [122];
+loads_xy = [134,    147,    148];
 
 end
