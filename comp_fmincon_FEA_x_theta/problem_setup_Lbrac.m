@@ -1,4 +1,4 @@
-function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= ...
+function [coords, conn, edofMat, numnode, numele, freedofs, F, H]= ...
     problem_setup_Lbrac(rmin)                     
                            
 ndiv=50;  %150, 100, 50, 30 use multiple of 5                           
@@ -102,7 +102,7 @@ coords_cells(2,:) = gs(5,:);
 dm_cells(1,1:numele)=rmin*(xspac*ones(1,numele));
 dm_cells(2,1:numele)=rmin*(yspac*ones(1,numele));
 
-W=zeros(numele,numele); 
+H=zeros(numele,numele); 
 for cc=1:numele
     gpos=coords_cells(:,cc); 
     [v,L]=nodes_in_support(numele, coords_cells, gpos, dm_cells);
@@ -112,10 +112,10 @@ for cc=1:numele
     dif=sqrt(difx.^2 + dify.^2); 
     rij=dif./sqrt(dm_cells(1,v).^2 + dm_cells(2,v).^2);
     wij=(rmin-rij)./rmin; 
-    W(cc,v)=wij; 
+    H(cc,v)=wij; 
 end
-W=W./sum(W,2); 
-W=sparse(W); 
+H=H./sum(H,2); 
+H=sparse(H); 
 
 figure
 patch('Faces',conn','Vertices',coords','LineWidth',1,...

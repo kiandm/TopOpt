@@ -1,5 +1,6 @@
 % FEA_MMS_Main.m 
 tic; clear; clc;
+addpath('Mains/')
 addpath('Functions/')
 % Parameters-----------------------------------------------
 volfrac = 0.5; penal = 3.0; rmin = 2.0; E0 = 1.0; 
