@@ -30,9 +30,7 @@ end
 % 5. Build filter structure
 [Wi, Wj, Ww, Wsum] = SensitivityFilter(ecent, rmin);  % sparse weights
 % 6. Initialise design
-
 x0 = volfrac * ones(nel,1);
-
 P = 1.0;  % load magnitude
 
 % Objective

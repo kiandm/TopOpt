@@ -1,6 +1,6 @@
-% FEA_MMS_Main.m 
+% main_MMA.m 
 tic; clear; clc;
-addpath('Mains/')
+%addpath('Mains/')
 addpath('Functions/')
 % Parameters-----------------------------------------------
 volfrac = 0.5; penal = 3.0; rmin = 3; E0 = 1.0; 
@@ -96,6 +96,11 @@ for it = 1:maxit
         break;
     end
 end
+% Measure of non-discreteness, M
+nGrey = sum(x > 0.05 & x < 0.95);
+M = nGrey / n;
+disp(M)    
+
 % plot iteration convergence history
 figure;
 plot(iterationHistory(1:it, 1), iterationHistory(1:it, 2), '-o');
