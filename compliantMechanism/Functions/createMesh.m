@@ -2,8 +2,8 @@ function [nn,nodes,nel,enodes,ndof,edof] = createMesh()
 % Imports list of node coordinates, as well as element construction from
 % Cubit, then constructs connectivity.
 addpath('C:\Users\sfxz32\OneDrive - Durham University\Desktop\Cubit')
-nodes_file    = readmatrix("lbeam_nodes.dat");      % [id, x, y]
-elements_file = readmatrix("lbeam_elements.dat");   % [eid, n1, n2, n3, n4]
+nodes_file    = readmatrix("forceinverter_nodes.dat");      % [id, x, y]
+elements_file = readmatrix("forceinverter_elements.dat");   % [eid, n1, n2, n3, n4]
 % Node coordinates & DoFs
 nn = size(nodes_file, 1);           % Number of nodes
 nodes = zeros(nn, 5);               % [id, x, y, dofUx, dofUy]
