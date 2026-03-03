@@ -4,7 +4,7 @@ tic; clear; clc;
 addpath('Functions/')
 % Parameters-----------------------------------------------
 volfrac = 0.5; penal = 3.0; rmin = 3; E0 = 1.0; 
-Emin = 1e-9; maxit = 200; tol = 1e-3; nu = 0.3; 
+Emin = 1e-6; maxit = 200; tol = 1e-3; nu = 0.3; 
 De = E0/(1-nu^2) * [1, nu,     0; 
                   nu,  1,     0; 
                    0,  0, (1-nu)/2]; % Material matrix
@@ -12,6 +12,8 @@ De = E0/(1-nu^2) * [1, nu,     0;
 [nn,nodes,nel,enodes,ndof,edof] = createMesh();
 % 2. Define BC and load nodesets
 [BCs_xy, LC,force_in, disp_out] = loadConditions();
+% Show mesh and loads
+plotGeometry(nodes, enodes, BCs_xy, LC, force_in, disp_out);
 % 3. Precompute KE0 per element
 KE0 = cell(nel,1);
 gp = [-1, 1]/sqrt(3); w = [1, 1];
@@ -62,13 +64,13 @@ for it = 1:maxit
     F_in = zeros(ndof,1);
     Pin = 1.0;
     F_in(2*force_in(:)-1) = Pin;
-    U_in = solveSystem(ndof,K,F_in,BCs_xy);
+    U_in = solveSystem(ndof,K,F_in,BCs_xy,LC);
 
     F_out = zeros(ndof,1);
     F_out(2*disp_out(:)-1) = 1.0;
-    U_out = solveSystem(ndof, K, F_out, BCs_xy);
+    U_out = solveSystem(ndof, K, F_out, BCs_xy, LC);
     % ----- Solve ----------------------------
-    U = solveSystem(ndof, K, F, BCs_xy);
+    U = solveSystem(ndof, K, F, BCs_xy, LC);
     % ----- Compliance and sensitivities -----
     [c, dc] = complianceandsensitivities(U_in, U_out, F_out, edof, KE0, x, penal, E0, Emin);
     % ----- Sensitivity filter ---------------
@@ -111,7 +113,7 @@ disp(M)
 figure;
 plot(iterationHistory(1:it, 1), iterationHistory(1:it, 2), '-o');
 xlabel('Iteration');
-ylabel('Objective Function (Compliance)');
+ylabel('Objective Function');
 title('Convergence History');
 grid on;
 % Plot final design density

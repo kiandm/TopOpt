@@ -1,6 +1,12 @@
-function [U] = solveSystem(ndof, K, F, BCs_xy)
+function [U] = solveSystem(ndof, K, F, BCs_xy, LC)
+    
+    BCs_xy = BCs_xy(:);
+    LC     = LC(:);
 
-    fixeddofs = sort([2*BCs_xy-1; 2*BCs_xy]);
+    BCs_y_dofs = 2 * BCs_xy;
+    LC_dofs = [2 * LC - 1; 2 * LC];
+
+    fixeddofs = sort([BCs_y_dofs; LC_dofs]);
     freedofs = setdiff(1:ndof, fixeddofs);
     fixed_values = zeros(numel(fixeddofs), 1);
 
