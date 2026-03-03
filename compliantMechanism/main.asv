@@ -90,7 +90,6 @@ for it = 1:maxit
     xold1 = xval;
     xval  = xnew;
     x = xnew;     % updated design
-    
     % ----- Convergence, logging -------------
     change = max(abs(x - xold));
     fprintf('It. %4d | Obj (c): %12.5e | Vol: %6.4f | chg: %8.4e\n', ...
