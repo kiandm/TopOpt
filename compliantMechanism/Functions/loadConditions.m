@@ -1,6 +1,7 @@
 function [BCs_xy, LC,force_in, disp_out] = loadConditions()
-% Defines two nodesets from Cubit ABAQUS file, containing nodes for BCs,
-% and nodes for loads.
+% Defines nodesets from Cubit ABAQUS file, containing nodes for BCs,
+% and nodes for loads. BCs_xy is the roller conditions on the top edge, LC
+% is the fixed bottom left corner to prevent rigid body motion.
 
 BCs_xy = [
       62,      63,      64,      65,      66,      67,...

@@ -4,14 +4,14 @@ tic; clear; clc;
 addpath('Functions/')
 % Parameters-----------------------------------------------
 volfrac = 0.5; penal = 3.0; rmin = 3; E0 = 1.0; 
-Emin = 1e-9; maxit = 500; tol = 1e-3; nu = 0.3; 
+Emin = 1e-9; maxit = 200; tol = 1e-3; nu = 0.3; 
 De = E0/(1-nu^2) * [1, nu,     0; 
                   nu,  1,     0; 
                    0,  0, (1-nu)/2]; % Material matrix
 % 1. Import mesh
 [nn,nodes,nel,enodes,ndof,edof] = createMesh();
 % 2. Define BC and load nodesets
-[BCs_xy,loads_xy] = loadConditions();
+[BCs_xy, LC,force_in, disp_out] = loadConditions();
 % 3. Precompute KE0 per element
 KE0 = cell(nel,1);
 gp = [-1, 1]/sqrt(3); w = [1, 1];
@@ -59,12 +59,18 @@ for it = 1:maxit
     % ----- Assemble K(x) and F -------------
     [K, F] = assembleSystem(nodes, enodes, ndof, edof, KE0, x, penal, E0, Emin);
     % ----- Apply loads ---------------------
-    P = 1.0;
-    F(2*loads_xy(:)) = F(2*loads_xy(:)) - P;
+    F_in = zeros(ndof,1);
+    Pin = 1.0;
+    F_in(2*force_in(:)-1) = Pin;
+    U_in = solveSystem(ndof,K,F_in,BCs_xy);
+
+    F_out = zeros(ndof,1);
+    F_out(2*disp_out(:)-1) = 1.0;
+    U_out = solveSystem(ndof, K, F_out, BCs_xy);
     % ----- Solve ----------------------------
     U = solveSystem(ndof, K, F, BCs_xy);
     % ----- Compliance and sensitivities -----
-    [c, dc] = complianceandsensitivities(U, edof, KE0, x, penal, E0, Emin);
+    [c, dc] = complianceandsensitivities(U_in, U_out, F_out, edof, KE0, x, penal, E0, Emin);
     % ----- Sensitivity filter ---------------
     dcf = applySensitivityFilter(dc, x, Wi, Wj, Ww, Wsum);
     % ----- MMA routine ----------------------
