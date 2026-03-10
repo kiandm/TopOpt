@@ -25,4 +25,5 @@ for e = 1:nel
 end
 % Total DOFs
 ndof = 2 * nn;
+
 end

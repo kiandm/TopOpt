@@ -59,7 +59,7 @@ c_MMA = 10000*ones(m,1);            % Column vector with the constants c_i in th
 d     = zeros(m,1);                 % Column vector with the constants d_i in the terms 0.5*d_i*(y_i)^2.
 % Filter design variable 
 %xphy=xval; % 
-x = applySensitivityFilter(x, x, Wi, Wj, Ww, Wsum); % density filter
+x_tilde = applySensitivityFilter(x, x, Wi, Wj, Ww, Wsum); % density filter
 x_phy = heavisideProjection(x, beta, eta);
 %(xphy is used only in FE_analysis, objective_function, and final ploting
 % but is not not used in the MMA. In the MMA unfiltered x i used)
@@ -71,7 +71,7 @@ for it = 1:maxit
     xold = x;
     % ----- Assemble K(x) and F -------------
     x = applySensitivityFilter(x, x, Wi, Wj, Ww, Wsum);
-    x_phy = heavisideProjection(x, beta, eta);
+    x_phy = heavisideProjection(x_tilde, beta, eta);
     fprintf('Assembling system...\n');
     [K, F] = assembleSystem(nodes, enodes, ndof, edof, KE0, x_phy, penal, E0, Emin);
     fprintf('Assembly done.\n');
@@ -119,7 +119,7 @@ for it = 1:maxit
     % ----- Sensitivity filter ---------------
     fprintf('Applying filter...\n');
     %dcf = applySensitivityFilter(dc, x, Wi, Wj, Ww, Wsum);
-    [~, dxphy] = heavisideProjection(x, beta, eta);
+    [~, dxphy] = heavisideProjection(x_tilde, beta, eta);
     dc_projected = dc .* dxphy;
     dcf = applySensitivityFilter(dc_projected, x, Wi, Wj, Ww, Wsum);
     fprintf('Filter done.\n');

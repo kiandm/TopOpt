@@ -1,7 +1,8 @@
 function [c, dc] = complianceandsensitivities(U_in, U_out, F_out, edof, KE0, x, penal, E0, Emin)
     nel = numel(x);
     dc  = zeros(nel,1);
-    c   = 0.0;
+    %c   = 0.0;
+    c    = - F_out' * U_in; 
     for e = 1:nel
         dofs = edof(e,:);
         
@@ -12,7 +13,10 @@ function [c, dc] = complianceandsensitivities(U_in, U_out, F_out, edof, KE0, x, 
 
         %se   = Ue' * KE0{e} * Ue;               % strain energy with unit E
         %Esc = Emin + (E0 - Emin) * x(e)^penal;  % element E
-        c    = F_out' * U_in;
+        
+        % c = -U_in*(2*U_out(1)-1);
+        
         dc(e)= - Ue_out' * dKe * Ue_in;
     end
+    %fprintf("c = %g, max|dc| = %g\n", c, max(abs(dc)));
 end

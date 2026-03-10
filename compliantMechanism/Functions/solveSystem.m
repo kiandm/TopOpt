@@ -17,6 +17,15 @@ function [U] = solveSystem(ndof, K, F, BCs_xy, LC)
     
     U = zeros(ndof, 1);
     U(fixeddofs) = fixed_values;
+
+    fprintf('Starting linear solve, size Kff = %d x %d\n', size(Kff));
+    fprintf('rcond(Kff) = %e\n', rcond(full(Kff)));
+    tic;
     U(freedofs) = Kff \ (Ff - Kfc * fixed_values);
+    fprintf('Solve completed in %.2f seconds\n', toc);
     
+    if rcond(full(Kff)) < 1e-12
+        warning("Kff is nearly singular: rcond = %g", rcond(Kff));
+    end
+
 end
