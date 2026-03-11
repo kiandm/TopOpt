@@ -1,5 +1,5 @@
 function [x_phy,dxphy] = heavisideProjection(x,beta,eta)
-%HEAVISIDEPROJECTION Summary of this function goes here
+%HEAVISIDE PROJECTION Summary of this function goes here
 %   Detailed explanation goes here
 x_phy = (tanh(beta * eta) + tanh(beta * (x - eta))) / ...
     (tanh(beta * eta) + tanh(beta * (1 - eta)));

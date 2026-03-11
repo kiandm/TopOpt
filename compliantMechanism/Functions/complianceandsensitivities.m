@@ -2,7 +2,7 @@ function [c, dc] = complianceandsensitivities(U_in, U_out, F_out, edof, KE0, x, 
     nel = numel(x);
     dc  = zeros(nel,1);
     %c   = 0.0;
-    c    = - F_out' * U_in; 
+    c    =  F_out' * U_in;  % Not sure about the minus sign
     for e = 1:nel
         dofs = edof(e,:);
         

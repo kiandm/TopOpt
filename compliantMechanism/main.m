@@ -4,8 +4,8 @@ tic; clear; clc;
 addpath('Functions/')
 dbstop if error
 % Parameters-----------------------------------------------
-volfrac = 0.5; penal = 3.0; rmin = 3; E0 = 1.0; 
-Emin = 1e-6; maxit = 80; tol = 1e-3; nu = 0.3; 
+volfrac = 0.25; penal = 3.0; rmin = 3; E0 = 1.0; 
+Emin = 1e-4; maxit = 180; tol = 1e-3; nu = 0.3; 
 k_in = 1; k_out = 0.001;
 beta = 2; eta = 0.5;
 De = E0/(1-nu^2) * [1, nu,     0; 
@@ -42,12 +42,12 @@ x = volfrac * ones(nel,1);
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
 m     = 1;                          % The number of general constraints.
 n     = nel;                        % The number of design variables x_j.
-%xmin = zeros(n,1);
-%xmax = ones(n,1);
+xmin = zeros(n,1);
+xmax = ones(n,1);
 xval = x;
 
-xmin = max(0, xval - 0.2);
-xmax = min(1, xval + 0.2);
+%xmin = max(0, xval - 0.2);
+%xmax = min(1, xval + 0.2);
 
 xold1 = xval;                       % xval, one iteration ago (provided that iter>1).
 xold2 = xval;                       % xval, two iterations ago (provided that iter>2).
@@ -133,6 +133,9 @@ for it = 1:maxit
     dfdx = (1/nel) * ones(1,n);
     % MMA call
     fprintf('Running MMA...\n');
+    move = 0.2;
+    xmin = max(0, xval - move);
+    xmax = min(1, xval + move);
     [xnew,~,~,~,~,~,~,~,~,low,upp] = mmasub( ...
               m, n, it, xval, xmin, xmax, xold1, xold2, ...
                 f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d );
@@ -141,7 +144,7 @@ for it = 1:maxit
     xval  = xnew;
     x = xnew;     % updated design
     fprintf('MMA done.\n');
-    if mod(it, 20) == 0
+    if mod(it, 30) == 0
         beta = min(beta * 2, 64);
         fprintf('Beta updated to %d\n', beta);
     end
@@ -154,10 +157,12 @@ for it = 1:maxit
     % ----- Iteration history ----------------
     iterationHistory(it, :) = [it, c, mean(x), change];
     % ----- Quick plot -----------------------
-    %if mod(it,10)==1 || change<tol
-        %plotDensityMesh(nodes, enodes, x);
-        %drawnow;
-    %end
+    fprintf('Running plot...\n');
+    if mod(it,5)==1 || change<tol
+        plotDensityMesh(nodes, enodes, x);
+        drawnow;
+    end
+    fprintf('plot done.\n');
     if change < tol
         break;
     end
