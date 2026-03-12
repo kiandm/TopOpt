@@ -4,10 +4,10 @@ tic; clear; clc;
 addpath('Functions/')
 dbstop if error
 % Parameters-----------------------------------------------
-volfrac = 0.25; penal = 3.0; rmin = 2; E0 = 1.0; 
-Emin = 1e-4; maxit = 198; tol = 1e-3; nu = 0.3; 
+volfrac = 0.25; penal = 3.0; rmin = 3; E0 = 1.0; 
+Emin = 1e-4; maxit = 180; tol = 1e-3; nu = 0.3; 
 k_in = 1; k_out = 0.001;
-beta = 1; eta = 0.5;
+beta = 2; eta = 0.5;
 De = E0/(1-nu^2) * [1, nu,     0; 
                   nu,  1,     0; 
                    0,  0, (1-nu)/2]; % Material matrix
@@ -71,8 +71,7 @@ iterationHistory = zeros(maxit, 4);  % Preallocate iteration history array
 for it = 1:maxit
     xold = x;
     % ----- Assemble K(x) and F -------------
-    x_tilde = applyDensityFilter(x, Wi, Wj, Ww, Wsum);
-    %x_tilde = applySensitivityFilter(x, x, Wi, Wj, Ww, Wsum);
+    x_tilde = applySensitivityFilter(x, Wi, Wj, Ww, Wsum);
     x_phy = heavisideProjection(x, beta, eta);
 
     [K, F] = assembleSystem(nodes, enodes, ndof, edof, KE0, x_phy, penal, E0, Emin);
@@ -126,8 +125,7 @@ for it = 1:maxit
     dfdx = (1/nel) * ones(1,n);
 
     % MMA call
-    %move = 0.2;
-    move = 5/beta;
+    move = 0.2;
     xmin = max(0, xval - move);
     xmax = min(1, xval + move);
 
@@ -140,7 +138,7 @@ for it = 1:maxit
     xval  = xnew;
     x = xnew;     % updated design
 
-    if mod(it, 40) == 0
+    if mod(it, 30) == 0
         beta = min(beta * 2, 64);
         fprintf('Beta updated to %d\n', beta);
     end
@@ -151,12 +149,27 @@ for it = 1:maxit
             it, c, mean(x_phy), change);
     
     % ----- Iteration history ----------------
-    iterationHistory(it, :) = [it, c, mean(x_phy), change];
+    iterationHistory(it, :) = [it, c, mean(x), change];
 
     % ----- Quick plot -----------------------
     if mod(it,5)==1 || change<tol
-        plotDensityMesh(nodes, enodes, x_phy);
+        plotDensityMesh(nodes, enodes, x);
         drawnow;
+    end
+    if it == 56
+        figure;
+        plotDensityMesh(nodes, enodes, xphy);
+        title('Design at best iteration');
+    end
+    if it == 57
+        figure;
+        plotDensityMesh(nodes, enodes, xphy);
+        title('Design at best iteration');
+    end
+    if it == 58
+        figure;
+        plotDensityMesh(nodes, enodes, xphy);
+        title('Design at best iteration');
     end
 
     if change < tol
@@ -177,7 +190,6 @@ xlabel('Iteration');
 ylabel('Objective Function');
 title('Convergence History');
 grid on;
-
 % Plot final design density
 figure;
 plotDensityMesh(nodes, enodes, x);
