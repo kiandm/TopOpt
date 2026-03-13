@@ -1,16 +1,22 @@
-% main_MMA.m 
+% main.m 
 tic; clear; clc;
 %addpath('Mains/')
 addpath('Functions/')
 dbstop if error
 % Parameters-----------------------------------------------
-volfrac = 0.25; penal = 3.0; rmin = 3; E0 = 1.0; 
-Emin = 1e-4; maxit = 180; tol = 1e-3; nu = 0.3; 
+volfrac = 0.25; penal = 3.0; rmin = 2; E0 = 1.0; 
+Emin = 1e-4; maxit = 248; tol = 1e-3; nu = 0.3; 
 k_in = 1; k_out = 0.001;
-beta = 2; eta = 0.5;
+beta = 1; eta = 0.5;
 De = E0/(1-nu^2) * [1, nu,     0; 
                   nu,  1,     0; 
                    0,  0, (1-nu)/2]; % Material matrix
+% Initialise video writer
+v = VideoWriter('topology_optimisation.mp4', 'MPEG-4');
+v.FrameRate = 5;  % frames per second
+v.Quality = 95;
+open(v);
+fig = figure('Visible','off');
 %% 
 % 1. Import mesh
 [nn,nodes,nel,enodes,ndof,edof] = createMesh();
@@ -43,6 +49,7 @@ end
 
 % 6. Initialise design
 x = volfrac * ones(nel,1);
+c_best = 0.0;
 %% 
 % 7. Initialise MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
@@ -61,8 +68,8 @@ c_MMA = 10000*ones(m,1);            % Column vector with the constants c_i in th
 d     = zeros(m,1);                 % Column vector with the constants d_i in the terms 0.5*d_i*(y_i)^2.
 % Filter design variable 
 %xphy=xval; % 
-x = applySensitivityFilter(x, x, Wi, Wj, Ww, Wsum); % density filter
-x_phy = heavisideProjection(x, beta, eta);
+%x = applySensitivityFilter(x, x, Wi, Wj, Ww, Wsum); % density filter
+%x_phy = heavisideProjection(x, beta, eta);
 %(xphy is used only in FE_analysis, objective_function, and final ploting
 % but is not not used in the MMA. In the MMA unfiltered x i used)
 %%
@@ -71,22 +78,23 @@ iterationHistory = zeros(maxit, 4);  % Preallocate iteration history array
 for it = 1:maxit
     xold = x;
     % ----- Assemble K(x) and F -------------
-    x_tilde = applySensitivityFilter(x, Wi, Wj, Ww, Wsum);
-    x_phy = heavisideProjection(x, beta, eta);
+    x_tilde = applyDensityFilter(x, Wi, Wj, Ww, Wsum);
+    %x_tilde = applySensitivityFilter(x, x, Wi, Wj, Ww, Wsum);
+    x_phy = heavisideProjection(x_tilde, beta, eta);
 
     [K, F] = assembleSystem(nodes, enodes, ndof, edof, KE0, x_phy, penal, E0, Emin);
 
     % Adding spring BCs
     for i = 1:length(force_in)
         nid = force_in(i);
-        k = 1;
+        k = k_in;
         dof_x = 2*nid-1;
         K(dof_x,dof_x) = K(dof_x,dof_x) + k;
     end
 
     for i = 1:length(disp_out)
         nid = disp_out(i);
-        k = 0.001;
+        k = k_out;
         dof_x = 2*nid-1;
         K(dof_x,dof_x) = K(dof_x,dof_x) + k;
     end
@@ -125,7 +133,8 @@ for it = 1:maxit
     dfdx = (1/nel) * ones(1,n);
 
     % MMA call
-    move = 0.2;
+    %move = 0.2;
+    move = min(0.2, 5/beta);
     xmin = max(0, xval - move);
     xmax = min(1, xval + move);
 
@@ -138,50 +147,60 @@ for it = 1:maxit
     xval  = xnew;
     x = xnew;     % updated design
 
-    if mod(it, 30) == 0
-        beta = min(beta * 2, 64);
+    if mod(it, 20) == 0
+        beta = min(beta + 1, 8);
         fprintf('Beta updated to %d\n', beta);
     end
 
     % ----- Convergence, logging -------------
     change = max(abs(x - xold));
-    fprintf('It. %4d | Obj (c): %12.5e | Vol: %6.4f | chg: %8.4e\n', ...
-            it, c, mean(x_phy), change);
-    
+    M = sum(4 * x_phy .* (1 - x_phy))/n * 100;
+    fprintf('It. %4d | Obj (c): %12.5e | Vol: %6.4f | chg: %8.4e| M: %6.4f\n', ...
+            it, c, mean(x_phy), change, M);
+    % Storing x values for specific iteration plotting
+    %storage(it) = [x_phy];
+    % Track best design
+    if c < c_best
+        c_best = c;
+        x_best = x;
+        x_phy_best = x_phy;
+        it_best = it;
+    end
+
     % ----- Iteration history ----------------
-    iterationHistory(it, :) = [it, c, mean(x), change];
+    iterationHistory(it, :) = [it, c, mean(x_phy), change];
 
     % ----- Quick plot -----------------------
-    if mod(it,5)==1 || change<tol
-        plotDensityMesh(nodes, enodes, x);
-        drawnow;
-    end
-    if it == 56
-        figure;
-        plotDensityMesh(nodes, enodes, xphy);
-        title('Design at best iteration');
-    end
-    if it == 57
-        figure;
-        plotDensityMesh(nodes, enodes, xphy);
-        title('Design at best iteration');
-    end
-    if it == 58
-        figure;
-        plotDensityMesh(nodes, enodes, xphy);
-        title('Design at best iteration');
-    end
+    %if mod(it,5)==1 || change<tol
+    %    plotDensityMesh(nodes, enodes, x_phy);
+    %    drawnow;
+    %end
+
+    % Capture frame every iteration
+    clf(fig);
+    plotDensityMesh(nodes, enodes, x_phy);
+    title(sprintf('It: %d | c: %.4f | Vol: %.3f | beta: %.1f', it, c, mean(x_phy), beta));
+    colorbar;
+    %drawnow;
+    frame = getframe(fig);
+    writeVideo(v, frame);
 
     if change < tol
         break;
     end
 
 end
+close(v);
+close(fig);
+fprintf('Video saved as topology_optimisation.mp4\n');
 %%
 % Measure of non-discreteness, M
 nGrey = sum(x > 0.05 & x < 0.95);
 M = nGrey / n;
 disp(M)    
+
+% M = sum(4 * x_phy * (1 - x_phy))/n * 100
+%fprintf('Measure of non-discrete, M = %6.4f', M)
 
 % plot iteration convergence history
 figure;
@@ -190,12 +209,22 @@ xlabel('Iteration');
 ylabel('Objective Function');
 title('Convergence History');
 grid on;
+
 % Plot final design density
 figure;
-plotDensityMesh(nodes, enodes, x);
+plotDensityMesh(nodes, enodes, x_phy);
 xlabel('X Coordinate');
 ylabel('Y Coordinate');
 title('Final Design Density');
+colorbar;
+grid on;
+
+% Plot best design density
+figure;
+plotDensityMesh(nodes, enodes, x_phy_best);
+xlabel('X Coordinate');
+ylabel('Y Coordinate');
+title('%6.4f Design Density', it_best);
 colorbar;
 grid on;
 
