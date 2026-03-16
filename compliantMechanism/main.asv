@@ -1,18 +1,28 @@
 % main.m 
 tic; clear; clc;
-%addpath('Mains/')
 addpath('Functions/')
 dbstop if error
 % Parameters-----------------------------------------------
-volfrac = 0.25; penal = 3.0; rmin = 2; E0 = 1.0; 
-Emin = 1e-4; maxit = 248; tol = 1e-3; nu = 0.3; 
-k_in = 1; k_out = 0.001;
-beta = 1; eta = 0.5;
+volfrac = 0.4; % Target volume fraction
+penal = 3.0;   % SIMP penalisation factor
+rmin = 3;      % Radius for filter
+E0 = 1.0;      % Initial Young's modulus value
+Emin = 1e-4;   % Minimum stiffness (Prevents 0 stiffness elements)
+
+maxit = 249;   % Iteration limit
+tol = 1e-3;    % Stopping criteria for change in density
+nu = 0.3;      % Poisson's ratio
+
+k_in = 1;      % Input spring constant
+k_out = 0.001; % Output spring constant
+beta = 2;      % Heaviside curvature parameter
+eta = 0.5;
 De = E0/(1-nu^2) * [1, nu,     0; 
                   nu,  1,     0; 
                    0,  0, (1-nu)/2]; % Material matrix
+
 % Initialise video writer
-v = VideoWriter('topology_optimisation.mp4', 'MPEG-4');
+v = VideoWriter('topology_optimisation_5.mp4', 'MPEG-4');
 v.FrameRate = 5;  % frames per second
 v.Quality = 95;
 open(v);
@@ -29,7 +39,7 @@ fig = figure('Visible','off');
 
 % 3. Precompute KE0 per element
 KE0 = cell(nel,1);
-gp = [-1, 1]/sqrt(3); w = [1, 1];
+gp = [-1, 1]/sqrt(3); w = [1, 1];   % Gauss quadrature
 for e = 1:nel
     n  = enodes(e,:);
     xe = nodes(n,2); ye = nodes(n,3);
@@ -49,7 +59,7 @@ end
 
 % 6. Initialise design
 x = volfrac * ones(nel,1);
-c_best = 0.0;
+c_best = +inf;
 %% 
 % 7. Initialise MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
@@ -68,8 +78,6 @@ c_MMA = 10000*ones(m,1);            % Column vector with the constants c_i in th
 d     = zeros(m,1);                 % Column vector with the constants d_i in the terms 0.5*d_i*(y_i)^2.
 % Filter design variable 
 %xphy=xval; % 
-%x = applySensitivityFilter(x, x, Wi, Wj, Ww, Wsum); % density filter
-%x_phy = heavisideProjection(x, beta, eta);
 %(xphy is used only in FE_analysis, objective_function, and final ploting
 % but is not not used in the MMA. In the MMA unfiltered x i used)
 %%
@@ -77,12 +85,16 @@ d     = zeros(m,1);                 % Column vector with the constants d_i in th
 iterationHistory = zeros(maxit, 4);  % Preallocate iteration history array
 for it = 1:maxit
     xold = x;
-    % ----- Assemble K(x) and F -------------
+    
+    % Apply filters to get x_tilde then x_phy
     x_tilde = applyDensityFilter(x, Wi, Wj, Ww, Wsum);
-    %x_tilde = applySensitivityFilter(x, x, Wi, Wj, Ww, Wsum);
     x_phy = heavisideProjection(x_tilde, beta, eta);
 
-    [K, F] = assembleSystem(nodes, enodes, ndof, edof, KE0, x_phy, penal, E0, Emin);
+    % Density clipping
+    %x_phy = max(x_phy, 1e-3);
+    
+    % Assemble
+    [K] = assembleSystem(nodes, enodes, ndof, edof, KE0, x_phy, penal, E0, Emin);
 
     % Adding spring BCs
     for i = 1:length(force_in)
@@ -99,21 +111,15 @@ for it = 1:maxit
         K(dof_x,dof_x) = K(dof_x,dof_x) + k;
     end
 
-    % ----- Apply loads ---------------------
+    % ----- Apply loads & solve ---------------------
     F_in = zeros(ndof,1);
-    Pin = 1.0;
-    F_in(2*force_in(:)-1) = Pin;
-
-    U_in  = solveSystem(ndof, K, F_in, BCs_xy, LC);
+    F_in(2*force_in(:)-1) = 1.0;
 
     F_out = zeros(ndof,1);
     F_out(2*disp_out(:)-1) = 1.0;
-
+    
+    U_in  = solveSystem(ndof, K, F_in, BCs_xy, LC);
     U_out = solveSystem(ndof, K, F_out, BCs_xy, LC);
-
-    % ----- Solve ----------------------------
-    U = solveSystem(ndof, K, F, BCs_xy, LC);
-    %fprintf('rank(K) = %d (ndof = %d)\n', rank(full(K)), ndof);
 
     % ----- Compliance and sensitivities -----
     [c, dc] = complianceandsensitivities(U_in, U_out, F_out, edof, KE0, x_phy, penal, E0, Emin);
@@ -122,19 +128,22 @@ for it = 1:maxit
     [~, dxphy] = heavisideProjection(x_tilde, beta, eta);
     dc_projected = dc .* dxphy;
     dcf = applySensitivityFilter(dc_projected, x, Wi, Wj, Ww, Wsum);
-
+    
     % ----- MMA routine ----------------------
     %x = OC_update(x, dcf, volfrac);
     
     % Initial values for MMA
-    f0val = c; % Initial objective function value
+    f0val = c;                     % Initial objective function value
     df0dx = dcf;
-    fval = mean(x_phy) - volfrac; % Initial volume constraint value
-    dfdx = (1/nel) * ones(1,n);
+    fval = mean(x_phy) - volfrac;  % Initial volume constraint value
+    %dfdx = (1/nel) * ones(1,n);
+    dfdx_raw      = (1/nel) * dxphy;   % dxphy already computed above
+    dfdx_filtered = applySensitivityFilter(dfdx_raw, x, Wi, Wj, Ww, Wsum);
+    dfdx          = dfdx_filtered';
 
     % MMA call
     %move = 0.2;
-    move = min(0.2, 5/beta);
+    move = min(0.2, 0.5/(beta+1));
     xmin = max(0, xval - move);
     xmax = min(1, xval + move);
 
@@ -146,10 +155,16 @@ for it = 1:maxit
     xold1 = xval;
     xval  = xnew;
     x = xnew;     % updated design
-
-    if mod(it, 20) == 0
-        beta = min(beta + 1, 8);
-        fprintf('Beta updated to %d\n', beta);
+    
+    % Beta continuation scheme
+    if mod(it, 20) == 0 && beta < 10
+        beta = min(beta + 0.4, 10);
+        % Reset MMA memory to avoid oscillation after beta jump
+        xold1 = xval;
+        xold2 = xval;
+        low   = max(0, xval - move);
+        upp   = min(1, xval + move);
+        fprintf('Beta updated to %.1f, MMA reset at iteration %d\n', beta, it);
     end
 
     % ----- Convergence, logging -------------
@@ -157,8 +172,7 @@ for it = 1:maxit
     M = sum(4 * x_phy .* (1 - x_phy))/n * 100;
     fprintf('It. %4d | Obj (c): %12.5e | Vol: %6.4f | chg: %8.4e| M: %6.4f\n', ...
             it, c, mean(x_phy), change, M);
-    % Storing x values for specific iteration plotting
-    %storage(it) = [x_phy];
+
     % Track best design
     if c < c_best
         c_best = c;
@@ -177,13 +191,15 @@ for it = 1:maxit
     %end
 
     % Capture frame every iteration
-    clf(fig);
-    plotDensityMesh(nodes, enodes, x_phy);
-    title(sprintf('It: %d | c: %.4f | Vol: %.3f | beta: %.1f', it, c, mean(x_phy), beta));
-    colorbar;
-    %drawnow;
-    frame = getframe(fig);
-    writeVideo(v, frame);
+    if mod(it, 5) == 0
+        clf(fig);
+        plotDensityMesh(nodes, enodes, x_phy);
+        title(sprintf('It: %d | c: %.4f | Vol: %.3f | beta: %.1f', it, c, mean(x_phy), beta));
+        colorbar;
+        %drawnow;
+        frame = getframe(fig);
+        writeVideo(v, frame);
+    end
 
     if change < tol
         break;
@@ -192,15 +208,8 @@ for it = 1:maxit
 end
 close(v);
 close(fig);
-fprintf('Video saved as topology_optimisation.mp4\n');
+fprintf('Video saved\n');
 %%
-% Measure of non-discreteness, M
-nGrey = sum(x > 0.05 & x < 0.95);
-M = nGrey / n;
-disp(M)    
-
-% M = sum(4 * x_phy * (1 - x_phy))/n * 100
-%fprintf('Measure of non-discrete, M = %6.4f', M)
 
 % plot iteration convergence history
 figure;
@@ -224,7 +233,7 @@ figure;
 plotDensityMesh(nodes, enodes, x_phy_best);
 xlabel('X Coordinate');
 ylabel('Y Coordinate');
-title('%6.4f Design Density', it_best);
+title(sprintf('Best Design at Iteration %d (c=%.4f)', it_best, c_best));
 colorbar;
 grid on;
 

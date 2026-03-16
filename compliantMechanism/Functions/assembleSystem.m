@@ -1,6 +1,6 @@
-function [K, F] = assembleSystem(nodes, enodes, ndof, edof, KE0, x, penal, E0, Emin)
+function [K] = assembleSystem(nodes, enodes, ndof, edof, KE0, x, penal, E0, Emin)
     K = sparse(ndof, ndof);
-    F = sparse(ndof, 1);
+    %F = sparse(ndof, 1);
     
 
     % Scale each element KE0 by Escale(x)
