@@ -22,8 +22,8 @@ De = E0/(1-nu^2) * [1, nu,     0;
                    0,  0, (1-nu)/2]; % Material matrix
 
 % Initialise video writer
-v = VideoWriter('topology_optimisation_7.mp4', 'MPEG-4');
-v.FrameRate = 5;  % frames per second
+v = VideoWriter('topology_optimisation_8.mp4', 'MPEG-4');
+v.FrameRate = 3;  % frames per second
 v.Quality = 95;
 open(v);
 fig = figure('Visible','off');
@@ -41,7 +41,7 @@ fig = figure('Visible','off');
 KE0 = cell(nel,1);
 gp = [-1, 1]/sqrt(3); w = [1, 1];   % Gauss quadrature
 ecent = zeros(nel,2);
-for e = 1:nel
+parfor e = 1:nel
     n  = enodes(e,:);
     xe = nodes(n,2); ye = nodes(n,3);
     KE0{e} = assembleElementStiffnessQ4(xe, ye, De, gp, w);
@@ -181,7 +181,7 @@ for it = 1:maxit
     end
 
     % ----- Iteration history ----------------
-    iterationHistory(it, :) = [it, c, mean(x_phy), change];
+    iterationHistory(it, :) = [it, c, mean(x_phy), change, M];
 
     % ----- Quick plot -----------------------
     %if mod(it,5)==1 || change<tol
@@ -190,7 +190,7 @@ for it = 1:maxit
     %end
 
     % Capture frame every iteration
-    if mod(it, 5) == 0
+    if mod(it, 10) == 0
         clf(fig);
         plotDensityMesh(nodes, enodes, x_phy);
         title(sprintf('It: %d | c: %.4f | Vol: %.3f | beta: %.1f', it, c, mean(x_phy), beta));
@@ -213,10 +213,11 @@ fprintf('Video saved\n');
 % plot iteration convergence history + volume constraint
 figure;
 yyaxis left
-plot(iterationHistory(1:it, 1), iterationHistory(1:it, 2), '-o', 'MarkerSize', 3);
+plot(iterationHistory(1:it, 1), iterationHistory(1:it, 2), '-o', 'MarkerSize', 3);    % Obj. Func
 ylabel('Objective Function (c)');
 yyaxis right
-plot(iterationHistory(1:it, 1), iterationHistory(1:it, 3), '-o', 'MarkerSize', 3);
+plot(iterationHistory(1:it, 1), iterationHistory(1:it, 3), '-o', 'MarkerSize', 3);    % VolFrac 
+%plot(iterationHistory(1:it,1), iterationHistory(1:it,1), '-o', 'MarkerSize', 3)       % M
 yline(volfrac, '--', sprintf('Target = %.2f', volfrac), 'LabelHorizontalAlignment', 'left');
 ylabel('Volume Fraction');
 xlabel('Iteration');

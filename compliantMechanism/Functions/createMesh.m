@@ -2,8 +2,8 @@ function [nn,nodes,nel,enodes,ndof,edof] = createMesh()
 % Imports list of node coordinates, as well as element construction from
 % Cubit, then constructs connectivity.
 addpath('C:\Users\sfxz32\OneDrive - Durham University\Desktop\Cubit')
-nodes_file    = readmatrix("forceinverter_nodes(1).dat");      % [id, x, y]
-elements_file = readmatrix("forceinverter_elements(1).dat");   % [eid, n1, n2, n3, n4]
+nodes_file    = readmatrix("forceinverter_nodes(fine mesh).dat");      % [id, x, y]
+elements_file = readmatrix("forceinverter_elements(fine mesh).dat");   % [eid, n1, n2, n3, n4]
 % Node coordinates & DoFs
 nn = size(nodes_file, 1);           % Number of nodes
 nodes = zeros(nn, 5);               % [id, x, y, dofUx, dofUy]
@@ -16,7 +16,7 @@ nodes(:,5) = 2*nodes(:,1);          % Uy DOF = 2*id
 nel = size(elements_file, 1);
 enodes = elements_file(:, 2:5);     % take columns n1 n2 n3 n4
 edof = zeros(nel, 8);
-for e = 1:nel
+parfor e = 1:nel
     n = enodes(e,:);
     edof(e,:) = [2*n(1)-1, 2*n(1), ...
                  2*n(2)-1, 2*n(2), ...
