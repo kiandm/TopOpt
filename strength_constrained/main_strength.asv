@@ -1,26 +1,37 @@
-% main_MMA.m 
-tic; clear; clc;
-%addpath('Mains/')
+% This code does topology optimisation for an FRPC structure (L-bracket)
+% Design variables -> Element density and fibre orientation
+% Objective -> Compliance
+% Constraints -> Volume fraction and Tsai-Wu criterion (w/ p-norm aggregation)
+% Solver -> MMA
 addpath('Functions/')
 %% ---------------- Parameters---------------------------------------------
 volfrac = 0.5; penal = 3.0; rmin = 3; E0 = 1.0; 
-Emin = 1e-9; maxit = 500; tol = 1e-3; nu = 0.3; 
-De = E0/(1-nu^2) * [1, nu,     0; 
-                  nu,  1,     0; 
-                   0,  0, (1-nu)/2]; % Material matrix
+Emin = 1e-9; maxit = 100; tol = 1e-5; 
+
+% Material properties composites
+E1=10; % Young's modulus in fiber direction
+E2=1; % Young's modulus perpendicular to fiber direction
+nu12=0.3; % Major Poisson's ratio
+nu21=nu12*E2/E1; % Minor Poisson's ratio
+G12=E1/(2*(1+nu12)); % Shear modulus
+
+% Element elastic matrix
+De = [1/E1,   -nu12/E2,       0; 
+     -nu12/E2,    1/E2,       0; 
+      0,             0,  1/G12]; 
+
+% Rotation matrix
+T_theta = [cos(theta_e)^2, sin(theta_e)^2, -sin(2*theta_e);
+           sin(theta_e)^2, cos(theta_e)^2, sin(2*theta_e);
+           sin(theta_e)*cos(theta_e), -sin(theta_e)*cos(theta_e), cos(2*theta_e)];
+
 %%-------------------------------------------------------------------------
 %% 1. Import mesh
 [nn,nodes,nel,enodes,ndof,edof] = createMesh();
 % 2. Define BC and load nodesets
 [BCs_xy,loads_xy] = loadConditions();
 % 3. Precompute KE0 per element
-KE0 = cell(nel,1);
-gp = [-1, 1]/sqrt(3); w = [1, 1];
-parfor e = 1:nel
-    n  = enodes(e,:);
-    xe = nodes(n,2); ye = nodes(n,3);
-    KE0{e} = assembleElementStiffnessQ4(xe, ye, De, gp, w);
-end
+
 % 4. Precompute element centroids for filtering
 ecent = zeros(nel,2);
 parfor e = 1:nel
@@ -28,10 +39,21 @@ parfor e = 1:nel
     xy = [nodes(n,2), nodes(n,3)];
     ecent(e,:) = mean(xy,1);
 end
+
 % 5. Build filter structure
 [Wi, Wj, Ww, Wsum] = SensitivityFilter(ecent, rmin);  % sparse weights
-% 6. Initialise design
-x = volfrac * ones(nel,1);
+
+% 6. Initialise design variables
+dens = volfrac * ones(numele,1); % Density variables
+theta = pi/2 * ones(numele,1); % Fiber direction variables
+x0 = [dens; theta]; % Combine design variables
+% Bounds for densities and fiber directions
+xmin = 1e-4 * ones(numele,1); % Lower bound for densities
+xmax = 1 * ones(numele,1); % Upper bound for densities
+xmin_theta =  -pi * ones(numele,1); % Lower bound for fiber directions
+xmax_theta =   pi * ones(numele,1); % Upper bound for fiber directions
+LB = [xmin; xmin_theta]; UB = [xmax; xmax_theta]; % Combine bounds
+
 % 7. Initialise MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
 m     = 1;                          % The number of general constraints.
@@ -54,6 +76,17 @@ xphy=xval; %
 iterationHistory = zeros(maxit, 4);  % Preallocate iteration history array
 for it = 1:maxit
     xold = x;
+    thetaold = theta;
+
+    KE0 = cell(nel,1);
+    gp = [-1, 1]/sqrt(3); w = [1, 1];
+    parfor e = 1:nel
+        n  = enodes(e,:);
+        xe = nodes(n,2); ye = nodes(n,3);
+        KE0{e} = assembleElementStiffnessQ4(xe, ye, De, gp, w);
+    end
+
+
     % ----- Assemble K(x) and F -------------
     [K, F] = assembleSystem(nodes, enodes, ndof, edof, KE0, x, penal, E0, Emin);
     % ----- Apply loads ---------------------
@@ -62,7 +95,7 @@ for it = 1:maxit
     % ----- Solve ----------------------------
     U = solveSystem(ndof, K, F, BCs_xy);
     % ----- Compliance and sensitivities -----
-    [c, dc] = complianceandsensitivities(U, edof, KE0, x, penal, E0, Emin);
+    [c, dc, dtheta] = complianceandsensitivities(U, edof, KE0, x, penal, E0, Emin, De, theta, nodes, enodes, gp, w);
     % ----- Sensitivity filter ---------------
     dcf = applySensitivityFilter(dc, x, Wi, Wj, Ww, Wsum);
     % ----- MMA routine ----------------------
