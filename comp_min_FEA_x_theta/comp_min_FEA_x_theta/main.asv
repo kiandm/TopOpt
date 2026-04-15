@@ -5,7 +5,7 @@
 clear; clc; close all; warning off
 
 % Parameters
-volfrac = 0.4; % Volume fraction
+volfrac = 0.3; % Volume fraction
 penal = 3.0; % Penalization factor
 rmin = 1.5; % Filter radius
 
@@ -17,25 +17,25 @@ rmin = 1.5; % Filter radius
 % matprop.G12=matprop.E1/(2*(1+matprop.nu12)); % Shear modulus
 
 % Material properties composites
-% matprop.E1=10; % Young's modulus in fiber direction
-% matprop.E2=1; % Young's modulus perpendicular to fiber direction
-% matprop.nu12=0.3; % Major Poisson's ratio
-% matprop.nu21=matprop.nu12*matprop.E2/matprop.E1; % Minor Poisson's ratio
-% matprop.G12=matprop.E1/(2*(1+matprop.nu12)); % Shear modulus
-
-%Material properties composites (from Guowei Ma)
-matprop.E1=39e3; % Young's modulus in fiber direction
-matprop.E2=8.4e3; % Young's modulus perpendicular to fiber direction
-matprop.nu12=0.26; % Major Poisson's ratio
+matprop.E1=10; % Young's modulus in fiber direction
+matprop.E2=1; % Young's modulus perpendicular to fiber direction
+matprop.nu12=0.3; % Major Poisson's ratio
 matprop.nu21=matprop.nu12*matprop.E2/matprop.E1; % Minor Poisson's ratio
-matprop.G12=4.2e3; % Shear modulus
+matprop.G12=matprop.E1/(2*(1+matprop.nu12)); % Shear modulus
+
+% %Material properties composites (from Guowei Ma)
+% matprop.E1=39e3; % Young's modulus in fiber direction
+% matprop.E2=8.4e3; % Young's modulus perpendicular to fiber direction
+% matprop.nu12=0.26; % Major Poisson's ratio
+% matprop.nu21=matprop.nu12*matprop.E2/matprop.E1; % Minor Poisson's ratio
+% matprop.G12=4.2e3; % Shear modulus
 
 % Strength allowables (NEW)
-strength.Xt = 1000;
-strength.Xc = 600;
-strength.Yt = 40;
-strength.Yc = 150;
-strength.S  = 70;
+strength.Xt = 50;
+strength.Xc = 50;
+strength.Yt = 50;
+strength.Yc = 50;
+strength.S  = 30;
 
 %%
 % [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin);
@@ -166,9 +166,9 @@ while change > 1e-3 && iter < 200
     xphy(numele+1:end) = (H*xval(numele+1:end))./Hs; % theta
     % xval=xphy; 
 
-    % Print results (Changed V print)
+    % Print results
     change = max(abs(xval(1:numele) - xold1(1:numele)));
-    fprintf('It %d: Obj = %f, V = %f, Change = %f\n', iter, c, mean(x), change);
+    fprintf('It %d: Obj = %f, V const = %f, Change = %f\n', iter, c, v, change);
     
     % Plot design
     colormap(jet);
@@ -178,11 +178,6 @@ while change > 1e-3 && iter < 200
 end
 warning on
 %%
-% Measure of non-discreteness (NEW)
-nGrey = sum(x > 0.05 & x < 0.95);
-M = nGrey / n;
-disp(M) 
-
 %plot angles
 % Update design variables
 x = xphy(1:numele);

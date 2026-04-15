@@ -1,4 +1,4 @@
-function dDe_dtheta = dRotateElasticMatrix(De, theta)
+function dCrot = dRotateElasticMatrix(C, theta)
 % Analytic derivative of the rotated elastic matrix w.r.t. theta
 
     c = cos(theta);  s = sin(theta);
@@ -14,10 +14,12 @@ function dDe_dtheta = dRotateElasticMatrix(De, theta)
          -c*s,   c*s,  c^2-s^2];
 
     Tinv  = inv(T);
-    RTRi  = R * T / R;   % R*T*R^{-1}
+    Rinv = inv(R);
+    RTRi  = R * T * Rinv;   % R*T*R^{-1}
 
     % Product rule: d/dtheta [ Tinv * De * inv(RTRi) ]
     dTinv   = -Tinv * dT * Tinv;
     dRTRi   = R * dT / R;
-    dDe_dtheta = dTinv * De / RTRi + Tinv * De * (-RTRi \ dRTRi / RTRi);
+    %dDe_dtheta = dTinv * De / RTRi + Tinv * De * (-RTRi \ dRTRi / RTRi);
+    dCrot = dTinv * C * RTRi + Tinv * C * dRTRi;
 end

@@ -1,40 +1,25 @@
-% This code does topology optimisation for an FRPC structure (L-bracket)
-% Design variables -> Element density and fibre orientation
-% Objective -> Compliance
-% Constraints -> Volume fraction and Tsai-Wu criterion (w/ p-norm aggregation)
-% Solver -> MMA
-clear; clc;tic
+% main.m 
+tic; clear; clc;
+%addpath('Mains/')
 addpath('Functions/')
-%% ---------------- Parameters---------------------------------------------
-volfrac = 0.5; penal = 3.0; rmin = 3; E0 = 1.0; 
-Emin = 1e-9; maxit = 250; tol = 1e-5; 
-
-% Material properties composites
-E1=10; % Young's modulus in fiber direction
-E2=1; % Young's modulus perpendicular to fiber direction
-nu12=0.3; % Major Poisson's ratio
-nu21=nu12*E2/E1; % Minor Poisson's ratio
-G12=E1/(2*(1+nu12)); % Shear modulus
-
-% Element elastic matrix
-De = [1/E1,   -nu12/E2,       0; 
-     -nu12/E2,    1/E2,       0; 
-      0,             0,  1/G12]; 
-C = [E1/(1-nu12*nu21), nu21*E1/(1-nu12*nu21), 0;
-     nu12*E2/(1-nu12*nu21), E2/(1-nu12*nu21), 0;
-     0, 0, G12];
-% Rotation matrix
-%T_theta = [cos(theta_e)^2, sin(theta_e)^2, -sin(2*theta_e);
-%           sin(theta_e)^2, cos(theta_e)^2, sin(2*theta_e);
-%           sin(theta_e)*cos(theta_e), -sin(theta_e)*cos(theta_e), cos(2*theta_e)];
-
-%%-------------------------------------------------------------------------
-%% 1. Import mesh
+% Parameters-----------------------------------------------
+volfrac = 0.5; penal = 3.0; rmin = 2.0; E0 = 1.0; 
+Emin = 1e-9; maxit = 200; tol = 1e-3; nu = 0.3; 
+De = E0/(1-nu^2) * [1, nu,     0; 
+                  nu,  1,     0; 
+                   0,  0, (1-nu)/2]; % Material matrix
+% 1. Import mesh
 [nn,nodes,nel,enodes,ndof,edof] = createMesh();
 % 2. Define BC and load nodesets
 [BCs_xy,loads_xy] = loadConditions();
 % 3. Precompute KE0 per element
-
+KE0 = cell(nel,1);
+gp = [-1, 1]/sqrt(3); w = [1, 1];
+for e = 1:nel
+    n  = enodes(e,:);
+    xe = nodes(n,2); ye = nodes(n,3);
+    KE0{e} = assembleElementStiffnessQ4(xe, ye, De, gp, w);
+end
 % 4. Precompute element centroids for filtering
 ecent = zeros(nel,2);
 for e = 1:nel
@@ -42,82 +27,28 @@ for e = 1:nel
     xy = [nodes(n,2), nodes(n,3)];
     ecent(e,:) = mean(xy,1);
 end
-
 % 5. Build filter structure
 [Wi, Wj, Ww, Wsum] = SensitivityFilter(ecent, rmin);  % sparse weights
-
-% 6. Initialise design variables
-x = volfrac * ones(nel,1); % Density variables
-theta = pi/2 * ones(nel,1); % Fiber direction variables
-x0 = [x; theta]; % Combine design variables
-% Bounds for densities and fiber directions
-xmin = 1e-4 * ones(nel,1); % Lower bound for densities
-xmax = 1 * ones(nel,1); % Upper bound for densities
-xmin_theta =  -pi * ones(nel,1); % Lower bound for fiber directions
-xmax_theta =   pi * ones(nel,1); % Upper bound for fiber directions
-LB = [xmin; xmin_theta]; UB = [xmax; xmax_theta]; % Combine bounds
-
-% % 7. Initialise MMA OPTIMIZER
-% %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
-% m     = 1;                          % The number of general constraints.
-% n     = nel;                        % The number of design variables x_j.
-% xmin = zeros(n,1);
-% xmax = ones(n,1);
-% xval = x;
-% xold1 = xval;                       % xval, one iteration ago (provided that iter>1).
-% xold2 = xval;                       % xval, two iterations ago (provided that iter>2).
-% low   = xmin;  %ones(n,1);          % Column vector with the lower asymptotes from the previous iteration (provided that iter>1).
-% upp   = xmax;  %ones(n,1);          % Column vector with the upper asymptotes from the previous iteration (provided that iter>1).
-% a0    = 1;                          % The constants a_0 in the term a_0*z.
-% a     = zeros(m,1);                 % Column vector with the constants a_i in the terms a_i*z.
-% c_MMA = 10000*ones(m,1);            % Column vector with the constants c_i in the terms c_i*y_i.
-% d     = zeros(m,1);                 % Column vector with the constants d_i in the terms 0.5*d_i*(y_i)^2.
-% % Filter design variable 
-% xphy=xval; % 
-
-%% 8. Optimization loop
-iterationHistory = zeros(maxit, 4);  % Preallocate iteration history array
+% 6. Initialise design
+x = volfrac * ones(nel,1);
+% 7. Optimisation loop
+iterationHistory = zeros(maxit, 4);  % Preallocate iteration history array (saved 3 seconds)
 for it = 1:maxit
     xold = x;
-    thetaold = theta;
-
-    KE0 = cell(nel,1);
-    gp = [-1, 1]/sqrt(3); w = [1, 1];
-    for e = 1:nel
-        n  = enodes(e,:);
-        xe = nodes(n,2); ye = nodes(n,3);
-        KE0{e} = assembleElementStiffnessQ4(e,nel,xe, ye, C, gp, w, E1,E2,nu12,nu21,G12,theta);
-    end
-
-
-    % ----- Assemble K(x) and F -------------
+    % ----- Assemble K(x) and F --------------
     [K, F] = assembleSystem(nodes, enodes, ndof, edof, KE0, x, penal, E0, Emin);
-    % ----- Apply loads ---------------------
+    % ----- Apply loads ----------------------
     P = 1.0;
     F(2*loads_xy(:)) = F(2*loads_xy(:)) - P;
     % ----- Solve ----------------------------
     U = solveSystem(ndof, K, F, BCs_xy);
     % ----- Compliance and sensitivities -----
-    [c, dc, dtheta] = complianceandsensitivities(E1,E2,nu12,nu21,G12,U, edof, KE0, x, penal, E0, Emin, De, theta, nodes, enodes, gp, w);
+    [c, dc] = complianceandsensitivities(U, edof, KE0, x, penal, E0, Emin);
     % ----- Sensitivity filter ---------------
     dcf = applySensitivityFilter(dc, x, Wi, Wj, Ww, Wsum);
+    % ----- OC update ------------------------
     x = OC_update(x, dcf, volfrac);
-    dthetaf = applySensitivityFilter(dtheta, x, Wi, Wj, Ww, Wsum);
-    theta   = theta_update(theta, dthetaf);
-    % % ----- MMA routine ----------------------
-    % % Initial values for MMA
-    % f0val = c; % Initial objective function value
-    % df0dx = dcf;
-    % fval = mean(x) - volfrac; % Initial volume constraint value
-    % dfdx = (1/nel) * ones(1,n);
-    % % MMA call
-    % [xnew,~,~,~,~,~,~,~,~,low,upp] = mmasub( ...
-    %           m, n, it, xval, xmin, xmax, xold1, xold2, ...
-    %             f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d );
-    % xold2 = xold1;
-    % xold1 = xval;
-    % xval  = xnew;
-    % x = xnew;     % updated design
+    % x = fmincon()
     % ----- Convergence, logging -------------
     change = max(abs(x - xold));
     fprintf('It. %4d | Obj (c): %12.5e | Vol: %6.4f | chg: %8.4e\n', ...
@@ -133,20 +64,18 @@ for it = 1:maxit
         break;
     end
 end
-
 % Measure of non-discreteness, M
 nGrey = sum(x > 0.05 & x < 0.95);
+nel = length(x);
 M = nGrey / nel;
-disp(M)    
-
-% plot iteration convergence history
+disp(M)  
+% 8. Plot iteration convergence history
 figure;
 plot(iterationHistory(1:it, 1), iterationHistory(1:it, 2), '-o');
 xlabel('Iteration');
 ylabel('Objective Function (Compliance)');
 title('Convergence History');
 grid on;
-
 % Plot final design density
 figure;
 plotDensityMesh(nodes, enodes, x);
@@ -156,23 +85,4 @@ title('Final Design Density');
 colorbar;
 grid on;
 toc
-%% 
-
-%plot angles
-figure
-patch('Faces',enodes,'Vertices',ecent,'FaceVertexCData',x(1:nel),...
-      'FaceColor','flat','EdgeColor',[0 0 0]); colorbar; %axis equal off;
-axis equal; hold on 
-len=0.05; 
-theta=x(nel+1:end); 
-theta = H*(theta./Hs);
-
-u_len=len*cos(theta); 
-v_len=len*sin(theta); 
-
-x_cen=(coords(1,conn(1,:))+coords(1,conn(4,:)))/2;    
-y_cen=(coords(2,conn(1,:))+coords(2,conn(2,:)))/2;    
-
-ind=find(x(1:numele)>0.5);
-quiver(x_cen(ind)',y_cen(ind)',u_len(ind),v_len(ind),'Color','r','LineWidth',2); 
 

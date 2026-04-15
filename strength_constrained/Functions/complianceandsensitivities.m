@@ -1,4 +1,4 @@
-function [c, dc, dtheta] = complianceandsensitivities(E1,E2,nu12,nu21,G12,U, edof, KE0, x, penal, E0, Emin, De, theta,nodes, enodes, gp, w)
+function [c, dc, dtheta] = complianceandsensitivities(U, edof, KE0, x, penal, E0, Emin, C, theta, nodes, enodes, gp, w)
     nel = numel(x);
     dc  = zeros(nel,1);
     dtheta = zeros(nel,1);
@@ -13,9 +13,8 @@ function [c, dc, dtheta] = complianceandsensitivities(E1,E2,nu12,nu21,G12,U, edo
 
         n  = enodes(e,:);
         xe = nodes(n,2); ye = nodes(n,3);
-        dDe_dtheta = dRotateElasticMatrix(De, theta(e));
-        dKe_dtheta = assembleElementStiffnessQ4(e,nel,xe,ye,dDe_dtheta,gp,w, E1,E2,nu12,nu21,G12,theta);
-
+        dCrot = dRotateElasticMatrix(C, theta(e));   % pass C not De
+        dKe_dtheta = assembleElementStiffnessWithFixedC(xe, ye, dCrot, gp, w);
         dtheta(e) = -(Emin + x(e)^penal * (E0-Emin)) * (Ue' * dKe_dtheta * Ue);
     end
 end

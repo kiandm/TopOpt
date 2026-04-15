@@ -1,5 +1,4 @@
-function KE = assembleElementStiffnessQ4(e,nel,xe, ye, C, gp, w, E1, E2, nu12, ...
-                                                    nu21, G12, theta )
+function KE = assembleElementStiffnessQ4(xe, ye, C, gp, w, theta)
     KE = zeros(8,8);
     for ixi = 1:2
         xi = gp(ixi); wx = w(ixi);
@@ -20,22 +19,18 @@ function KE = assembleElementStiffnessQ4(e,nel,xe, ye, C, gp, w, E1, E2, nu12, .
                                    dNdx(2,a), dNdx(1,a) ];
             end
             % Element elastic matrix
-            De = [1/E1,   -nu12/E2,       0; 
-                 -nu12/E2,    1/E2,       0; 
-                  0,             0,  1/G12]; 
-            %for e=1:nel
-                % Rotation matrix
-             T_theta = [cos(theta(e)).^2, sin(theta(e)).^2, -sin(2*theta(e));
-                       sin(theta(e)).^2, cos(theta(e)).^2, sin(2*theta(e));
-                       sin(theta(e)).*cos(theta(e)), -sin(theta(e)).*cos(theta(e)), cos(2*theta(e))];
+             c = cos(theta);  s = sin(theta);
+             T = [   c.^2,   s.^2,   2*c.*s;
+                        s.^2,   c.^2,  -2*c.*s;
+                       -c.*s,   c.*s,  c.^2-s.^2   ];
             
              R = diag([1, 1, 2]);
-             %De_rot = T_theta * De * T_theta';
-                %De_rot = (T_theta / De) / (R .* T_theta / R );
-             C_rot = (T_theta \ C) * R * T_theta / R;
+             Tinv = inv(T);
+             Rinv = inv(R);
+             C_rot = Tinv * C * R * T * Rinv;
 
              KE = KE + (B' * C_rot * B) * abs(detJ) * (wx * wy);
-            %end
+
         end
     end
 end

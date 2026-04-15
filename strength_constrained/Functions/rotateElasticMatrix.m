@@ -5,7 +5,7 @@ function De_rot = rotateElasticMatrix(De, theta)
 %   De_rot = T^{-1} * De * T^{-T}
 
     c = cos(theta);  s = sin(theta);
-    c2 = c^2;  s2 = s^2;  cs = c*s;
+    c2 = c.^2;  s2 = s.^2;  cs = c*s;
 
     % Stress transformation matrix (Voigt, plane stress)
     T = [ c2,    s2,    2*cs;
