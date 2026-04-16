@@ -8,7 +8,7 @@ clear; clc; close all; warning off
 volfrac = 0.3; % Volume fraction
 penal = 3.0; % Penalization factor
 rmin = 1.5; % Filter radius
-maxiter = 500;
+maxiter = 150;
 
 % % Material properties isotropic
 % matprop.E1=1; % Young's modulus in fiber direction
@@ -191,9 +191,9 @@ disp(M2) % percentage of average greyness (i.e. design is M2% grey )
 x = xphy(1:numele);
 theta = xphy(numele+1:end);
 
-figure
+figure(2)
 patch('Faces',conn','Vertices',coords','FaceVertexCData',x,...
-      'FaceColor','flat','EdgeColor',[0 0 0]); colorbar; %axis equal off;
+      'FaceColor','flat','EdgeColor','none'); colorbar; %axis equal off;
 axis equal; hold on 
 len=0.05; 
 u_len=len*cos(theta); 
