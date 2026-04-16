@@ -1,4 +1,4 @@
-function [U] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop)
+function [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop)
     % Update design variables
     x = xphy(1:numele);
     theta = xphy(numele+1:end);

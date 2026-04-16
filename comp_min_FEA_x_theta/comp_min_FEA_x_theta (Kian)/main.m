@@ -8,6 +8,7 @@ clear; clc; close all; warning off
 volfrac = 0.3; % Volume fraction
 penal = 3.0; % Penalization factor
 rmin = 1.5; % Filter radius
+maxiter = 500;
 
 % % Material properties isotropic
 % matprop.E1=1; % Young's modulus in fiber direction
@@ -31,11 +32,11 @@ matprop.G12=matprop.E1/(2*(1+matprop.nu12)); % Shear modulus
 % matprop.G12=4.2e3; % Shear modulus
 
 % Strength allowables (NEW)
-strength.Xt = 50;
-strength.Xc = 50;
-strength.Yt = 50;
-strength.Yc = 50;
-strength.S  = 30;
+strength.Xt = 30;
+strength.Xc = 30;
+strength.Yt = 3;
+strength.Yc = 9;
+strength.S  = 6;
 
 %%
 % [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin);
@@ -100,14 +101,14 @@ xphy=xval; %
 %%
 % Optimization loop
 change = 1; iter = 0;
-while change > 1e-3 && iter < 200
+while change > 1e-3 && iter < maxiter
     iter = iter + 1;
 
-    % FE Analysis
-    [U] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+    % FE Analysis (Extracting K and KE0 too now for TW)
+    [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
     
     % Tsai-Wu constraint (NEW)
-    [g_tw, dgtw_dx, dgtw_dtheta,TW,sigmax] = TsaiWu(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength);
+    [g_tw, dgtw_dx, dgtw_dtheta,TW,sigmax] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength);
 
 
     % Objective function and sensitivities
@@ -166,9 +167,9 @@ while change > 1e-3 && iter < 200
     xphy(numele+1:end) = (H*xval(numele+1:end))./Hs; % theta
     % xval=xphy; 
 
-    % Print results
+    % Print results (Changed V print)
     change = max(abs(xval(1:numele) - xold1(1:numele)));
-    fprintf('It %d: Obj = %f, V const = %f, Change = %f\n', iter, c, v, change);
+    fprintf('It %d: Obj = %f, V = %f, Change = %f\n', iter, c, v, change);
     
     % Plot design
     colormap(jet);
@@ -178,6 +179,13 @@ while change > 1e-3 && iter < 200
 end
 warning on
 %%
+% Measure of non-discreteness (NEW)
+nGrey = sum(x > 0.05 & x < 0.95);
+M1 = nGrey / numele;
+M2 = sum(4 * x .* (1 - x))/n;
+disp(M1) % percentage of elements with density between 0.05<x<0.95
+disp(M2) % percentage of average greyness (i.e. design is M2% grey )
+
 %plot angles
 % Update design variables
 x = xphy(1:numele);
@@ -197,8 +205,27 @@ for i=1:numele
     y_cen(i)=mean(coords(2, conn(:,i)));
 end 
 
-ind=find(xphy(1:numele)>0.5);
-quiver(x_cen(ind),y_cen(ind),u_len(ind),v_len(ind),'Color','r','LineWidth',1); 
+%ind=find(xphy(1:numele)>0.5);
+%quiver(x_cen(ind),y_cen(ind),u_len(ind),v_len(ind),'Color','r','LineWidth',1); 
+
+barLength = 1;          % TOTAL bar length
+halfL = barLength / 2;
+
+ind = find(x > 0.5);       % only plot in solid regions
+
+for k = 1:length(ind)
+    e = ind(k);
+    theta_e = theta(e);
+
+    x1 = x_cen(e) - halfL*cos(theta_e);
+    x2 = x_cen(e) + halfL*cos(theta_e);
+    y1 = y_cen(e) - halfL*sin(theta_e);
+    y2 = y_cen(e) + halfL*sin(theta_e);
+
+    line([x1 x2], [y1 y2], ...
+         'Color','k', ...
+         'LineWidth',1.2);
+end
 
 % (NEW)
 
