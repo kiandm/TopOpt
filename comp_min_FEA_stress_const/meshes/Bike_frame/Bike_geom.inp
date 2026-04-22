@@ -1,0 +1,14 @@
+********************************** N O D E S **********************************
+*NODE, NSET=ALLNODES, INPUT=/Users/zahurullah/Library/CloudStorage/OneDrive-DurhamUniversity/QUB_data/1 Data/TopOpt/Code/Composites/MMA_TopOpt/comp_min_FEA_stress_const/meshes/Bike_frame/nodes.dat
+********************************** E L E M E N T S ****************************
+*ELEMENT, TYPE=S4R, ELSET=EB1, INPUT=/Users/zahurullah/Library/CloudStorage/OneDrive-DurhamUniversity/QUB_data/1 Data/TopOpt/Code/Composites/MMA_TopOpt/comp_min_FEA_stress_const/meshes/Bike_frame/elements.dat
+********************************** N O D E S E T S **********************************
+*NSET, NSET=NS1
+       2,
+*NSET, NSET=NS2
+      16,
+*NSET, NSET=NS3
+      96,     130,     131,     132,     133,     134,
+     135,     136,     137,     138,     139,     140,
+     141,     142,     143,     144,     145,     146,
+     147,

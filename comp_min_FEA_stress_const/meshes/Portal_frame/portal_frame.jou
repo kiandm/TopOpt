@@ -1,0 +1,39 @@
+#!python
+#Ref:  Huang, Xiaodong, et al. "Reformulation for stress topology optimization of continuum structures by floating projection." Computer Methods in Applied Mechanics and Engineering 423 (2024): 116870.
+
+cubit.cmd('reset')
+cubit.cmd('create vertex 0 0 0')
+cubit.cmd('create vertex 2 0 0')
+cubit.cmd('create vertex 15 0 0')
+cubit.cmd('create vertex 150 100 0')
+cubit.cmd('create vertex 285 0 0')
+cubit.cmd('create vertex 298 0 0')
+cubit.cmd('create vertex 300 0 0')
+cubit.cmd('create vertex 300 150 0')
+cubit.cmd('create vertex 155 150 0')
+cubit.cmd('create vertex 145 150 0')
+cubit.cmd('create vertex 0 150 0')
+
+
+cubit.cmd('create curve polyline vertex 1 2 3 4 5 6 7 8 9 10 11')
+cubit.cmd('create curve polyline vertex 11 1')
+
+cubit.cmd('create surface curve 1 2 3 4 5 6 7 8 9 10 11')
+
+
+cubit.cmd('create displacement on curve 1 dof all fix')
+cubit.cmd('create displacement on curve 6  dof all fix')
+cubit.cmd('create displacement on curve 9 dof all fix')
+
+
+cubit.cmd('surface all scheme pave')
+cubit.cmd('surface all size 100.0')
+cubit.cmd('mesh surface all')
+
+cubit.cmd('color Surface all lightseagreen')
+cubit.cmd('export abaqus "/Users/zahurullah/Library/CloudStorage/OneDrive-DurhamUniversity/QUB_data/1 Data/TopOpt/Code/Composites/MMA_TopOpt/comp_min_FEA_stress_const/meshes/Portal_frame/abc.inp" nodefile "/Users/zahurullah/Library/CloudStorage/OneDrive-DurhamUniversity/QUB_data/1 Data/TopOpt/Code/Composites/MMA_TopOpt/comp_min_FEA_stress_const/meshes/Portal_frame/nodes.dat" elementfile "/Users/zahurullah/Library/CloudStorage/OneDrive-DurhamUniversity/QUB_data/1 Data/TopOpt/Code/Composites/MMA_TopOpt/comp_min_FEA_stress_const/meshes/Portal_frame/elements.dat" mesh_only overwrite everything')
+
+
+
+
+

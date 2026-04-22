@@ -4,7 +4,7 @@ tic; clear; clc;
 addpath('Functions/')
 % Parameters-----------------------------------------------
 volfrac = 0.5; penal = 3.0; rmin = 2.0; E0 = 1.0; 
-Emin = 1e-9; maxit = 200; tol = 1e-3; nu = 0.3; 
+Emin = 1e-9; maxit = 100; tol = 1e-3; nu = 0.3; 
 De = E0/(1-nu^2) * [1, nu,     0; 
                   nu,  1,     0; 
                    0,  0, (1-nu)/2]; % Material matrix

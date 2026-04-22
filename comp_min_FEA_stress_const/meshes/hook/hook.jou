@@ -1,0 +1,47 @@
+#!python
+cubit.cmd('reset')
+
+cubit.cmd('create curve arc radius 1 center location 0 0 0 normal 0 0 1 start angle 0 stop angle 360')
+cubit.cmd('create curve arc radius 2 center location 0 0 0 normal 0 0 1 start angle 0 stop angle 180')
+
+cubit.cmd('create vertex 0 0 0')
+cubit.cmd('create vertex 6 0 0')
+
+cubit.cmd('create curve location at vertex 5 direction -0.5736  -0.8192 0 length 10')
+cubit.cmd('create curve arc radius 4 center location at vertex 5 normal 0 0 1 start angle 180 stop angle 235')
+cubit.cmd('create curve arc radius 8 center location at vertex 5 normal 0 0 1 start angle 180 stop angle 235')
+
+cubit.cmd('create curve arc radius 2 center location at vertex 6 normal 0 0 1 start angle 180 stop angle 55')
+cubit.cmd('create curve location at vertex 6 direction 1 0 0 length 10')
+cubit.cmd('create vertex atintersection curve 6 7')
+cubit.cmd('create curve location at vertex 15 direction -1 0 0 length 1.5')
+
+cubit.cmd('create vertex on curve 7 distance 1.5 from vertex 13')
+cubit.cmd('create curve arc center vertex 18 8 17 normal 0 0 -1')
+cubit.cmd('create curve vertex 11 20')
+cubit.cmd('delete Curve 8')
+cubit.cmd('split curve 10 fraction 0.5')
+cubit.cmd('create curve arc center vertex 25 26 23 normal 0 0 -1')
+cubit.cmd('split curve 6 at vertex 16')
+
+cubit.cmd('delete Curve 3 7 11 12')
+cubit.cmd(' delete Vertex 18 4 16 ')
+cubit.cmd('split curve 1 fraction 0.5')
+
+cubit.cmd('create surface curve all')
+
+
+cubit.cmd('create displacement on curve 16 dof all fix')
+cubit.cmd('create displacement on curve 14 dof all fix')
+
+cubit.cmd('surface all scheme pave')
+cubit.cmd('surface all size 0.14')
+cubit.cmd('mesh surface all')
+
+cubit.cmd('color Surface 1 lightseagreen')
+cubit.cmd('export abaqus "/Users/zahurullah/Desktop/bbb/hook/abc.inp" nodefile "/Users/zahurullah/Desktop/bbb/hook/nodes.dat" elementfile "/Users/zahurullah/Desktop/bbb/hook/elements.dat" overwrite everything')
+
+
+
+
+

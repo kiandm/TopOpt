@@ -1,0 +1,33 @@
+#!python
+cubit.cmd('reset')
+cubit.cmd('create vertex 0 0 0')
+cubit.cmd('create vertex 10 0 0')
+cubit.cmd('create vertex 40 0 0')
+cubit.cmd('create vertex 85 20 0')
+cubit.cmd('create vertex 100 50 0')
+cubit.cmd('create vertex 90 65 0')
+cubit.cmd('create vertex 45 65 0')
+cubit.cmd('create vertex 30 50 0')
+cubit.cmd('create vertex 10 50 0')
+cubit.cmd('create vertex 0 40 0')
+cubit.cmd('create vertex 0 10 0')
+
+cubit.cmd('create curve polyline vertex 2 3 4 5 6 7 8 9 10 11')
+cubit.cmd('create curve polyline vertex 2 11')
+cubit.cmd('create surface curve 1 2 3 4 5 6 7 8 9 10')
+cubit.cmd('delete vertex all')
+
+
+
+cubit.cmd('create displacement on vertex 11')
+cubit.cmd('create displacement on vertex 3')
+cubit.cmd('create force on curve 4')
+
+cubit.cmd('surface 1  scheme pave')
+cubit.cmd('surface 1 size 1')
+cubit.cmd('mesh surface 1')
+
+cubit.cmd('Finished Command: export abaqus "/Users/zahurullah/Library/CloudStorage/OneDrive-DurhamUniversity/QUB_data/1 Data/Durham/Teaching/Capstone projects/2024-25/MSc/Yimin Tian/cubit_model/Bike_geom.inp" nodefile "/Users/zahurullah/Library/CloudStorage/OneDrive-DurhamUniversity/QUB_data/1 Data/Durham/Teaching/Capstone projects/2024-25/MSc/Yimin Tian/cubit_model/nodes.dat" elementfile "/Users/zahurullah/Library/CloudStorage/OneDrive-DurhamUniversity/QUB_data/1 Data/Durham/Teaching/Capstone projects/2024-25/MSc/Yimin Tian/cubit_model/elements.dat" mesh_only dimension 2 overwrite everything')
+
+
+

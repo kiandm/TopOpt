@@ -1,6 +1,6 @@
 
-function [g_tw, dgtw_dx, dgtw_dtheta, TW, sigmax] = TsaiWu( ...
-    U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength)
+function [g_tw, dgtw_dx, dgtw_dtheta, TW, sigmax, TW_gp, vonMises] = TsaiWu( ...
+    U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs)
 %--------------------------------------------------------------------------
 % Tsai–Wu stress constraint with adjoint sensitivities
 % Fully consistent formulation (explicit + adjoint terms)
@@ -40,17 +40,16 @@ TW        = zeros(numele,1);
 dTWdx    = zeros(numele,1);
 dTWdth   = zeros(numele,1);
 sigmax   = zeros(numele,1);
-
+vonMises = zeros(numele,1);
+dKE0th = cell(numele,1);
 ndof = size(edofMat,2);
 gp   = [-1 1]/sqrt(3);
-
 % Store element adjoint RHS contributions
 fadj_elem = cell(numele,1);
-
 % Stress interpolation exponent
-q = 0.8;
+q = 3;
 
-% element loop (no aggregation yet) 
+% element loop 
 for e = 1:numele
 
     xe = coords(1,conn(:,e))';
@@ -66,8 +65,12 @@ for e = 1:numele
              -2*c*s, 2*c*s, c^2-s^2 ];
 
     TW_e   = 0.0;
+    dTWdx_e = 0.0;
     fadj_e = zeros(ndof,1);
+    dTW_dth_e = 0.0;
+    dKE_dth   = zeros(8,8);
     gcount = (e-1)*4;
+    
 
     for i = 1:2
         for j = 1:2
@@ -95,40 +98,79 @@ for e = 1:numele
                      0, dNdx(2,a);
                      dNdx(2,a), dNdx(1,a)];
             end
+            Tinv = [c^2,  s^2, -2*c*s;       % inverse rotation (stress form)
+                    s^2,  c^2,  2*c*s;
+                    c*s, -c*s,  c^2-s^2];
+
+            dTinv_dth = [-sin(2*theta),  sin(2*theta), -2*cos(2*theta);
+                          sin(2*theta), -sin(2*theta),  2*cos(2*theta);
+                          cos(2*theta), -cos(2*theta), -2*sin(2*theta)];
+
+            dCxy_dth = dTinv_dth * C0 * Tinv' + Tinv * C0 * dTinv_dth';
+
+            dKE_dth = dKE_dth + jac * wt * B' * dCxy_dth * B;
 
             % Strain/stress
             eps_l = T_eps * (B * Ue);
-            sig   = C0 * eps_l;
-
+            sig_unscaled   = C0 * eps_l;
+            sig = xdens^q * sig_unscaled;
+            %sig_scaled = xdens^q * sig; % SCALING
+            %s1 = sig_scaled(1); s2 = sig_scaled(2); t12 = sig_scaled(3);
             s1 = sig(1); s2 = sig(2); t12 = sig(3);
-            sigmax(e) = max(sigmax(e), sqrt(s1^2 + s2^2 + 2*t12^2));
+            sigmax(e) = max(sigmax(e), sqrt(s1^2 + s2^2 + 2*t12^2));    % This is the issue, plot g_e for stress
+
+            sig_global = Tinv * sig;
+            sx = sig_global(1); sy = sig_global(2); txy = sig_global(3);
+            vm_gp = sqrt(sx^2 - sx*sy + sy^2 + 3*txy^2);
+            vonMises(e) = vonMises(e) + vm_gp / 4;
 
             % Tsai–Wu at Gauss point
             TW_gp = F1*s1 + F2*s2 + ...
                     F11*s1^2 + F22*s2^2 + ...
                     F66*t12^2 + 2*F12*s1*s2;
 
-            TW_e = TW_e + TW_gp * wt * jac;
+            TW_e = TW_e + TW_gp / 4; % * wt * jac;
 
             % adjoint RHS (local) 
             psi = [ F1  + 2*F11*s1 + 2*F12*s2;
                     F2  + 2*F22*s2 + 2*F12*s1;
                     2*F66*t12 ];
 
-            fadj_e = fadj_e + ...
-                B' * T_eps' * C0' * psi * wt * jac;
+            % DENSITY SENSITIVITY (Chain Rule: dTW/dsig * dsig/dx)
+            dsig_dx = q * xdens^(q-1) * sig_unscaled;
+            dTWdx_gp = psi' * dsig_dx;
+            dTWdx_e = dTWdx_e + dTWdx_gp / 4;
+
+            % derivative of T_eps with respect to theta
+            dT_eps_dth = [-sin(2*theta),  sin(2*theta),   cos(2*theta);
+                           sin(2*theta), -sin(2*theta),  -cos(2*theta);
+                          -2*cos(2*theta), 2*cos(2*theta), -2*sin(2*theta)];
+            
+            dTW_dth_gp = psi' * (xdens^q * C0 * dT_eps_dth * (B * Ue));
+            dTW_dth_e  = dTW_dth_e + dTW_dth_gp / 4;
+            
+            fadj_gp = B' * T_eps' * C0' * psi * xdens^q;
+            fadj_e = fadj_e + fadj_gp / 4;
+            %fadj_e = fadj_e + xdens^q * B' * T_eps' * C0' * psi / 4; % * wt * jac;
         end
     end
 
     % Stress interpolation
-    TW(e)     = xdens^q * TW_e;
-    dTWdx(e)  = q * xdens^(q-1) * TW_e;
+    % TW(e)     = xdens^q * TW_e;
+    % dTWdx(e)  = q * xdens^(q-1) * TW_e;
+    % dTWdth(e) = dTW_dth_e;
+    % fadj_elem{e} = xdens^q * fadj_e;
+    % dKE0th{e}    = dKE_dth;
 
-    fadj_elem{e} = xdens^q * fadj_e;
+    TW(e)     = TW_e;         % Already relaxed, no extra scaling!
+    dTWdx(e)  = dTWdx_e;      % Exact analytic derivative
+    dTWdth(e) = dTW_dth_e;    % Exact analytic derivative
+    fadj_elem{e} = fadj_e;    % Single scaled, physical reality restored
+    dKE0th{e} = dKE_dth;
 end
 
 % p‑norm aggregation
-p = 8;
+p = 16; % 8 16 32
 TWp  = (mean(TW.^p))^(1/p);
 g_tw = TWp - 1;
 
@@ -141,7 +183,9 @@ for e = 1:numele
 end
 
 % adjoint solve
-lambda = K \ fadj;
+lambda = zeros(size(U));
+% lambda = K \ fadj;
+lambda(freedofs) = K(freedofs,freedofs) \ fadj(freedofs);
 
 % final sensitivities
 dgtw_dx = zeros(numele,1);
@@ -156,6 +200,16 @@ for e = 1:numele
                - penal * xdens^(penal-1) * (le' * Ke0 * Ue);
 end
 
-dgtw_dtheta = zeros(numele,1);  % θ‑adjoint not yet implemented
+dgtw_dtheta = zeros(numele,1);
+
+for e = 1:numele
+    xdens  = xphy(e);
+    theta  = xphy(numele + e);
+    Ue     = U(edofMat(e,:));
+    le     = lambda(edofMat(e,:));
+
+    dgtw_dtheta(e) = fac(e) * dTWdth(e) ...
+                   - xdens^penal * (le' * dKE0th{e} * Ue);
+end
 
 end
