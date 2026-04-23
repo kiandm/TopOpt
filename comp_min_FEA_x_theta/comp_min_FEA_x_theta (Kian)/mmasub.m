@@ -64,12 +64,12 @@ f0val,df0dx,fval,dfdx,low,upp,a0,a,c,d)
 %          in the current MMA subproblem.
 %
 %epsimin = sqrt(m+n)*10^(-9);
-epsimin = 10^(-7);
-raa0 = 0.00001;
-move = 1.0;
-albefa = 0.1;
-asyinit = 0.01;
-asyincr = 1.2;
+epsimin = 10^(-8);
+raa0 = 0.01;
+move = 0.1;
+albefa = 0.4;
+asyinit = 0.5;
+asyincr = 1.5;
 asydecr = 0.7;
 eeen = ones(n,1);
 eeem = ones(m,1);

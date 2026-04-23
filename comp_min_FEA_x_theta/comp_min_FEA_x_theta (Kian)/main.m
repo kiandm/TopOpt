@@ -8,8 +8,12 @@ clear; clc; close all; warning off
 % Parameters
 volfrac = 0.4; % Volume fraction
 penal = 3.0; % Penalization factor
-rmin = 2; % Filter radius
-maxiter = 250;
+rmin = 3.0; % Filter radius
+maxiter = 400;
+
+beta     = 2;       % Initial sharpness
+beta_max = 16;      % Maximum sharpness
+eta      = 0.5;     % Threshold (0.5 = standard, increase to erode, decrease to dilate)
 
 % % Material properties isotropic
 % matprop.E1=1; % Young's modulus in fiber direction
@@ -68,7 +72,7 @@ end
 
 % Initialize design variables
 x = volfrac * ones(numele,1); % Density variables
-theta = (pi/4) * ones(numele,1); % Fiber direction variables
+theta = (pi/2) * ones(numele,1); % Fiber direction variables
 % theta = 0.01 * rand(numele,1);
 
 % Combine design variables
@@ -117,11 +121,20 @@ end
 barLength = 1;              % TOTAL bar length
 halfL = barLength / 2;      % plot from middle of element
 
+% Heaviside projection
+x_tilde = (H*xval(1:numele))./Hs;
+xphy(1:numele) = x_tilde;
+xphy(1:numele) = xval(numele+1:end);
+
 % Optimisation loop
 iterationHistory = zeros(maxiter, 5);
 change = 1; iter = 0;
 while change > 1e-3 && iter < maxiter
     iter = iter + 1;
+    % Heaviside projection
+    x_tilde = (H*xval(1:numele))./Hs;
+    [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
+    xphy(1:numele) = x_proj;
 
     % FE Analysis (Extracting K and KE0 too now for TW)
     [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
@@ -145,11 +158,16 @@ while change > 1e-3 && iter < maxiter
     dgtw_dx     = H*(dgtw_dx./Hs);
     %dgtw_dtheta = H*(dgtw_dtheta./Hs);
 
+    % New sensitivities for Heaviside
+    dc_dx   = H*((dc_dx   .* dxphy)./Hs);
+    dv_dx   = H*((dv_dx   .* dxphy)./Hs);
+    dgtw_dx = H*((dgtw_dx .* dxphy)./Hs);
+
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta]; % Objective function sensitivities
     dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
             dgtw_dx(:).',     dgtw_dtheta(:).' ];  % Combined constraint sensitivities 
-    
+
     % Initial values for MMA
     f0val = c; % Initial objective function value
     fval = [v; 
@@ -178,7 +196,11 @@ while change > 1e-3 && iter < maxiter
     
     % %filter design variables both density and 
     % xphy=xval; 
-    xphy(1:numele) =     (H*xval(1:numele))./Hs; % density 
+    %xphy(1:numele) =     (H*xval(1:numele))./Hs; % old density filter 
+
+
+
+
     %xphy(numele+1:end) = (H*xval(numele+1:end))./Hs; % theta
     xphy(numele+1:end) = xval(numele+1:end);
     % xval=xphy; 
@@ -190,36 +212,38 @@ while change > 1e-3 && iter < maxiter
     fprintf('It %d: Obj = %f, V = %f, g_tw = %f, Change = %f\n', iter, c, v, g_tw, change);
     iterationHistory(iter, :) = [iter, c, v, change, g_tw];
 
-    % Plot design
+    % Plot design (x and theta)
     % colormap(jet);
     % patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
     %       'FaceColor','flat','EdgeColor',[0,0,0]); axis equal off; colorbar
     % clim([0 1]);  drawnow;
     if mod(iter, 5) == 0 || iter == 1
         figure(1); clf;
-        % 1. Plot the Density (x)
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
         hold on;
-    
-        % 2. Calculate Fiber Bars for "solid" elements (x > 0.1)
         ind = find(xphy(1:numele) > volfrac); % Only show fibers where there is material
         theta_curr = xphy(numele+1:end);
-        
-        % The "NaN" trick for high-speed plotting
         x_plot = [x_cen(ind) - halfL*cos(theta_curr(ind)), ...
                   x_cen(ind) + halfL*cos(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         y_plot = [y_cen(ind) - halfL*sin(theta_curr(ind)), ...
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
-        
-        % 3. Draw all fiber bars in one go
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        
         title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_tw));
         drawnow;
+    end
+    % Beta continuation block
+    if mod(iter, 50) == 0 && beta < beta_max
+        beta = min(beta+2, beta_max);
+        fprintf('   >>> Beta updated to: %d\n',beta)
+        % Reset MMA internal state to prevent spikes
+        xold1 = xval;
+        xold2 = xval;
+        low   = xmin;
+        upp   = xmax;
     end
 end
 warning on
@@ -244,7 +268,6 @@ len=0.05;
 u_len=len*cos(theta); 
 v_len=len*sin(theta); 
 
-
 ind = find(x > 0.5);        % only plot in solid regions
 
 for k = 1:length(ind)
@@ -261,8 +284,7 @@ for k = 1:length(ind)
          'LineWidth',1.2);
 end
 
-% (NEW)
-
+% von Mises and Tsai-Wu stress plots
 figure(3);
 mask = xphy(1:numele) < 0.3;
 field_plot1 = vonMises;
