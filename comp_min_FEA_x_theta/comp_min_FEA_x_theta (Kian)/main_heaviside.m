@@ -1,16 +1,15 @@
 % MMA Optimization for Topology Optimization with Filtering
 % By Zahur Ullah 21/5/2025 and edited to add stress-constraint by Kian Das 20/4/2026
 % Here it is optimising both density and theta for a fibre-reinforced composite in 2D
-% No Heaviside
 clear; clc; close all; warning off
 %% Parameters
-volfrac = 0.4; % Volume fraction
-penal = 3.0; % Penalization factor
-rmin = 3.0; % Filter radius
+volfrac = 0.4;                                   % Volume fraction
+penal = 3.0;                                     % Penalization factor
+rmin = 3.0;                                      % Filter radius
 maxiter = 250;
-beta     = 2;       % Initial sharpness
-beta_max = 32;      % Maximum sharpness
-eta      = 0.5;     % Threshold (0.5 = standard, increase to erode, decrease to dilate)
+beta     = 2;                                    % Initial sharpness
+beta_max = 32;                                   % Maximum sharpness
+eta      = 0.5;                                  % Threshold (0.5 = standard, increase to erode, decrease to dilate)
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
 matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction
@@ -18,7 +17,7 @@ matprop.nu12=0.26;                               % Major Poisson's ratio
 matprop.nu21=matprop.nu12*matprop.E2/matprop.E1; % Minor Poisson's ratio
 matprop.G12=4.2e3;                               % Shear modulus
 % Strength allowables for Tsai-Wu
-strength.Xt=1062; 
+strength.Xt=1062;                                %
 strength.Xc=610; 
 strength.Yt=31; 
 strength.Yc=118; 
@@ -76,52 +75,52 @@ end
 barLength = 1;              % TOTAL bar length for fibre angle plotting
 halfL = barLength / 2;      % plot from middle of element
 % Heaviside projection
-%x_tilde = (H*xval(1:numele))./Hs;
-%[x_proj, ~] = heavisideProjection(x_tilde, beta, eta);
-%xphy(1:numele) = x_proj;
-%xphy(numele+1:end) = xval(numele+1:end);
+x_tilde = (H*xval(1:numele))./Hs;
+[x_proj, ~] = heavisideProjection(x_tilde, beta, eta);
+xphy(1:numele) = x_proj;
+xphy(numele+1:end) = xval(numele+1:end);
 %% Optimisation loop
 iterationHistory = zeros(maxiter, 5);
 change = 1; iter = 0;
 while change > 1e-3 && iter < maxiter
     iter = iter + 1;
 
-    % % Heaviside projection
-    % x_tilde = (H*xval(1:numele))./Hs;
-    % [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
-    % xphy(1:numele) = x_proj;
+    % Heaviside projection
+    x_tilde = (H*xval(1:numele))./Hs;
+    [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
+    xphy(1:numele) = x_proj;
 
     % FE Analysis (Extracting K and KE0 too now for TW)
     [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
     
     % Tsai-Wu constraint (NEW)
-    [g_tw, dgtw_dx, dgtw_dtheta,TW,sigmax, TW_gp, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+    [g_tw, dgtw_dx_raw, dgtw_dtheta,TW,sigmax, TW_gp, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
 
     % Objective function and sensitivities
-    [c, dc_dx, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);
+    [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);
     
     % Volume constraint and sensitivities
-    [v, dv_dx, dv_theta] = volume_constraint(xphy, volfrac, numele, ve);
+    [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve);
     
     % filtering of sensitivites
-    dc_dx = H*(dc_dx./Hs);
-    dv_dx = H*(dv_dx./Hs);
-    dc_theta = H*(dc_theta./Hs);
-    dv_theta = H*(dv_theta./Hs);
+    % dc_dx = H*(dc_dx./Hs);
+    % dv_dx = H*(dv_dx./Hs);
+    %dc_theta = H*(dc_theta./Hs);
+    %dv_theta = H*(dv_theta./Hs);
     % Filter gradients (NEW)
-    dgtw_dx     = H*(dgtw_dx./Hs);
-    dgtw_dtheta = H*(dgtw_dtheta./Hs);
+    % dgtw_dx     = H*(dgtw_dx./Hs);
+    %dgtw_dtheta = H*(dgtw_dtheta./Hs);
     % New sensitivities for Heaviside
     % dc_dx   = H*((dc_dx   .* dxphy)./Hs);
     % dv_dx   = H*((dv_dx   .* dxphy)./Hs);
     % dgtw_dx = H*((dgtw_dx .* dxphy)./Hs);
     
-    % dc_dx_chain   = dc_dx_raw   .* dxphy;
-    % dv_dx_chain   = dv_dx_raw   .* dxphy;
-    % dgtw_dx_chain = dgtw_dx_raw .* dxphy;
-    % dc_dx   = H * (dc_dx_chain   ./ Hs);
-    % dv_dx   = H * (dv_dx_chain   ./ Hs);
-    % dgtw_dx = H * (dgtw_dx_chain ./ Hs);
+    dc_dx_chain   = dc_dx_raw   .* dxphy;
+    dv_dx_chain   = dv_dx_raw   .* dxphy;
+    dgtw_dx_chain = dgtw_dx_raw .* dxphy;
+    dc_dx   = H * (dc_dx_chain   ./ Hs);
+    dv_dx   = H * (dv_dx_chain   ./ Hs);
+    dgtw_dx = H * (dgtw_dx_chain ./ Hs);
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Objective function sensitivities
     dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
@@ -151,7 +150,7 @@ while change > 1e-3 && iter < maxiter
     
     % %filter design variables both density and 
     % xphy=xval; 
-    xphy(1:numele) =     (H*xval(1:numele))./Hs; % old density filter 
+    %xphy(1:numele) =     (H*xval(1:numele))./Hs; % old density filter 
     %xphy(numele+1:end) = (H*xval(numele+1:end))./Hs; % theta
     xphy(numele+1:end) = xval(numele+1:end);
     % xval=xphy; 
@@ -187,15 +186,15 @@ while change > 1e-3 && iter < maxiter
         drawnow;
     end
     % Beta continuation block
-    % if mod(iter, 50) == 0 && beta < beta_max
-    %     beta = min(beta*2, beta_max);
-    %     fprintf('   >>> Beta updated to: %d\n',beta)
-    %     % Reset MMA internal state to prevent spikes
-    %     %xold1 = xval;
-    %     %xold2 = xval;
-    %     %low   = max(0, xval - move);
-    %     %upp   = min(1, xval + move);
-    % end
+    if mod(iter, 50) == 0 && beta < beta_max
+        beta = min(beta*2, beta_max);
+        fprintf('   >>> Beta updated to: %d\n',beta)
+        % Reset MMA internal state to prevent spikes
+        %xold1 = xval;
+        %xold2 = xval;
+        %low   = max(0, xval - move);
+        %upp   = min(1, xval + move);
+    end
 end
 warning on
 %%

@@ -1,53 +1,30 @@
 % MMA Optimization for Topology Optimization with Filtering
-% By Zahur Ullah 21/5/2025 and edited to add stress-constraint by Kian Das
-% 20/4/2026
-% Here it is optimising both density and theta for compoiste in 2D
-
+% By Zahur Ullah 21/5/2025 and edited to add stress-constraint by Kian Das 20/4/2026
+% Here it is optimising both density and theta for a fibre-reinforced composite in 2D
 clear; clc; close all; warning off
-
-% Parameters
+%% Parameters
 volfrac = 0.4; % Volume fraction
 penal = 3.0; % Penalization factor
 rmin = 3.0; % Filter radius
-maxiter = 400;
-
+maxiter = 250;
 beta     = 1;       % Initial sharpness
 beta_max = 32;      % Maximum sharpness
 eta      = 0.5;     % Threshold (0.5 = standard, increase to erode, decrease to dilate)
 
-% % Material properties isotropic
-% matprop.E1=1; % Young's modulus in fiber direction
-% matprop.E2=1; % Young's modulus perpendicular to fiber direction
-% matprop.nu12=0.3; % Major Poisson's ratio
-% matprop.nu21=matprop.nu12*matprop.E2/matprop.E1; % Minor Poisson's ratio
-% matprop.G12=matprop.E1/(2*(1+matprop.nu12)); % Shear modulus
-
-% % Material properties composites
-% matprop.E1=10; % Young's modulus in fiber direction
-% matprop.E2=1; % Young's modulus perpendicular to fiber direction
-% matprop.nu12=0.3; % Major Poisson's ratio
-% matprop.nu21=matprop.nu12*matprop.E2/matprop.E1; % Minor Poisson's ratio
-% matprop.G12=matprop.E1/(2*(1+matprop.nu12)); % Shear modulus
-
 %Material properties composites (from Guowei Ma)
-matprop.E1=39e3; % Young's modulus in fiber direction
-matprop.E2=8.4e3; % Young's modulus perpendicular to fiber direction
-matprop.nu12=0.26; % Major Poisson's ratio
+matprop.E1=39e3;                                 % Young's modulus in fiber direction
+matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction
+matprop.nu12=0.26;                               % Major Poisson's ratio
 matprop.nu21=matprop.nu12*matprop.E2/matprop.E1; % Minor Poisson's ratio
-matprop.G12=4.2e3; % Shear modulus
+matprop.G12=4.2e3;                               % Shear modulus
 
-% Strength allowables (Zahur)
+% Strength allowables for Tsai-Wu
 strength.Xt=1062; 
 strength.Xc=610; 
 strength.Yt=31; 
 strength.Yc=118; 
 strength.S=72; 
-% Strength allowables (Kian)
-% strength.Xt = 30;
-% strength.Xc = 30;
-% strength.Yt = 3;
-% strength.Yc = 9;
-% strength.S  = 6;
+
 
 %%
 % [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin);
@@ -91,8 +68,12 @@ xmax_theta =  (pi/2) * ones(numele,1); % Upper bound for fiber directions
 m     = 2;                          % The number of general constraints. (NEW)
 n     = numel(xval);                % The number of design variables x_j.
 
+%move = min(0.2, 0.5/(beta+1));
 xmin  = [xmin_x; xmin_theta];       % Column vector with the lower bounds for the variables x_j.
+%xmin  = [ max(0, xval - move); xmin_theta];
 xmax  = [xmax_x; xmax_theta];       % Column vector with the upper bounds for the variables x_j.
+%xmax  = [ min(1, xval + move); xmax_theta];
+
 
 xold1 = xval;        % xval, one iteration ago (provided that iter>1).
 xold2 = xval;        % xval, two iterations ago (provided that iter>2).
@@ -123,8 +104,11 @@ halfL = barLength / 2;      % plot from middle of element
 
 % Heaviside projection
 x_tilde = (H*xval(1:numele))./Hs;
-xphy(1:numele) = x_tilde;
-xphy(1:numele) = xval(numele+1:end);
+% xphy(1:numele) = x_tilde;
+% xphy(1:numele) = xval(numele+1:end);
+[x_proj, ~] = heavisideProjection(x_tilde, beta, eta);
+xphy(1:numele) = x_proj;
+xphy(numele+1:end) = xval(numele+1:end);
 
 % Optimisation loop
 iterationHistory = zeros(maxiter, 5);
@@ -140,28 +124,36 @@ while change > 1e-3 && iter < maxiter
     [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
     
     % Tsai-Wu constraint (NEW)
-    [g_tw, dgtw_dx, dgtw_dtheta,TW,sigmax, TW_gp, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+    [g_tw, dgtw_dx_raw, dgtw_dtheta,TW,sigmax, TW_gp, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
 
 
     % Objective function and sensitivities
-    [c, dc_dx, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);
+    [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);
     
     % Volume constraint and sensitivities
-    [v, dv_dx, dv_theta] = volume_constraint(xphy, volfrac, numele, ve);
+    [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve);
     
     % filtering of sensitivites
-    dc_dx = H*(dc_dx./Hs);
-    dv_dx = H*(dv_dx./Hs);
+    % dc_dx = H*(dc_dx./Hs);
+    % dv_dx = H*(dv_dx./Hs);
     %dc_theta = H*(dc_theta./Hs);
     %dv_theta = H*(dv_theta./Hs);
     % Filter gradients (NEW)
-    dgtw_dx     = H*(dgtw_dx./Hs);
+    % dgtw_dx     = H*(dgtw_dx./Hs);
     %dgtw_dtheta = H*(dgtw_dtheta./Hs);
 
     % New sensitivities for Heaviside
-    dc_dx   = H*((dc_dx   .* dxphy)./Hs);
-    dv_dx   = H*((dv_dx   .* dxphy)./Hs);
-    dgtw_dx = H*((dgtw_dx .* dxphy)./Hs);
+    % dc_dx   = H*((dc_dx   .* dxphy)./Hs);
+    % dv_dx   = H*((dv_dx   .* dxphy)./Hs);
+    % dgtw_dx = H*((dgtw_dx .* dxphy)./Hs);
+    
+    dc_dx_chain   = dc_dx_raw   .* dxphy;
+    dv_dx_chain   = dv_dx_raw   .* dxphy;
+    dgtw_dx_chain = dgtw_dx_raw .* dxphy;
+
+    dc_dx   = H * (dc_dx_chain   ./ Hs);
+    dv_dx   = H * (dv_dx_chain   ./ Hs);
+    dgtw_dx = H * (dgtw_dx_chain ./ Hs);
 
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta]; % Objective function sensitivities
@@ -212,34 +204,26 @@ while change > 1e-3 && iter < maxiter
     fprintf('It %d: Obj = %f, V = %f, g_tw = %f, Change = %f\n', iter, c, v, g_tw, change);
     iterationHistory(iter, :) = [iter, c, v, change, g_tw];
 
-    % Plot design
+    % Plot design (x and theta)
     % colormap(jet);
     % patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
     %       'FaceColor','flat','EdgeColor',[0,0,0]); axis equal off; colorbar
     % clim([0 1]);  drawnow;
     if mod(iter, 5) == 0 || iter == 1
         figure(1); clf;
-        % 1. Plot the Density (x)
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
         hold on;
-    
-        % 2. Calculate Fiber Bars for "solid" elements (x > 0.1)
         ind = find(xphy(1:numele) > volfrac); % Only show fibers where there is material
         theta_curr = xphy(numele+1:end);
-        
-        % The "NaN" trick for high-speed plotting
         x_plot = [x_cen(ind) - halfL*cos(theta_curr(ind)), ...
                   x_cen(ind) + halfL*cos(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         y_plot = [y_cen(ind) - halfL*sin(theta_curr(ind)), ...
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
-        
-        % 3. Draw all fiber bars in one go
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        
         title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_tw));
         drawnow;
     end
@@ -248,10 +232,10 @@ while change > 1e-3 && iter < maxiter
         beta = min(beta*2, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
         % Reset MMA internal state to prevent spikes
-        xold1 = xval;
-        xold2 = xval;
-        low   = xmin;
-        upp   = xmax;
+        %xold1 = xval;
+        %xold2 = xval;
+        %low   = max(0, xval - move);
+        %upp   = min(1, xval + move);
     end
 end
 warning on
@@ -292,8 +276,7 @@ for k = 1:length(ind)
          'LineWidth',1.2);
 end
 
-% von Mises and Tsai-W
-
+% von Mises and Tsai-Wu stress plots
 figure(3);
 mask = xphy(1:numele) < 0.3;
 field_plot1 = vonMises;
