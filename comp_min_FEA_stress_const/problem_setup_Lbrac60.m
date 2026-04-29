@@ -1,7 +1,7 @@
 function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= ...
     problem_setup_Lbrac60(rmin)                     
                            
-ndiv=100;  %150, 100, 50, 30 use multiple of 5                           
+ndiv=50;  %150, 100, 50, 30 use multiple of 5                           
 size_cell=100/ndiv;
 
 [x2d1, y2d1]=meshgrid(0:size_cell:40,   100:-size_cell:0); 

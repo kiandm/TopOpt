@@ -1,0 +1,7 @@
+function [principalStress, stressDirection] = calculatePrincipalStress(U, K, KE0, numele, gs, edofMat, coords, conn, matprop)
+% CALCULATE PRINCIPAL STRESS
+% Single FEA using isotropic material properties then assign stress
+% direction to theta
+%
+
+end
