@@ -192,24 +192,24 @@ while change > 1e-3 && iter < maxiter
     % patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
     %       'FaceColor','flat','EdgeColor',[0,0,0]); axis equal off; colorbar
     % clim([0 1]);  drawnow;
-    if mod(iter, 5) == 0 || iter == 1
-        figure(1); clf;
-        patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
-              'FaceColor','flat','EdgeColor','none'); 
-        axis equal tight off; colormap(flipud(gray)); colorbar;
-        hold on;
-        ind = find(xphy(1:numele) > 0.2); % Only show fibers where there is material
-        theta_curr = xphy(numele+1:end);
-        x_plot = [x_cen(ind) - halfL*cos(theta_curr(ind)), ...
-                  x_cen(ind) + halfL*cos(theta_curr(ind)), ...
-                  nan(length(ind),1)]';
-        y_plot = [y_cen(ind) - halfL*sin(theta_curr(ind)), ...
-                  y_cen(ind) + halfL*sin(theta_curr(ind)), ...
-                  nan(length(ind),1)]';
-        line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_tw));
-        drawnow;
-    end
+    % if mod(iter, 5) == 0 || iter == 1
+    %     figure(1); clf;
+    %     patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
+    %           'FaceColor','flat','EdgeColor','none'); 
+    %     axis equal tight off; colormap(flipud(gray)); colorbar;
+    %     hold on;
+    %     ind = find(xphy(1:numele) > 0.2); % Only show fibers where there is material
+    %     theta_curr = xphy(numele+1:end);
+    %     x_plot = [x_cen(ind) - halfL*cos(theta_curr(ind)), ...
+    %               x_cen(ind) + halfL*cos(theta_curr(ind)), ...
+    %               nan(length(ind),1)]';
+    %     y_plot = [y_cen(ind) - halfL*sin(theta_curr(ind)), ...
+    %               y_cen(ind) + halfL*sin(theta_curr(ind)), ...
+    %               nan(length(ind),1)]';
+    %     line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
+    %     title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_tw));
+    %     drawnow;
+    % end
     % Beta continuation block
     if mod(iter, 100) == 0 && beta < beta_max
         beta = min(beta*2, beta_max);
