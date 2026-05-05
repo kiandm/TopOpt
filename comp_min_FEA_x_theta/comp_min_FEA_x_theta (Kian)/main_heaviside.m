@@ -2,7 +2,8 @@
 % By Zahur Ullah 21/5/2025 and edited to add stress-constraint by Kian Das 20/4/2026
 % Here it is optimising both density and theta for a fibre-reinforced composite in 2D
 % With Heaviside
-clear; clc; close all;
+clear; clc; 
+close all;
 warning off
 %% Parameters
 volfrac = 0.4;                                   % Volume fraction
@@ -130,11 +131,11 @@ while change > 1e-3 && iter < maxiter
     % filtering of sensitivites
     % dc_dx = H*(dc_dx./Hs);
     % dv_dx = H*(dv_dx./Hs);
-    %dc_theta = H*(dc_theta./Hs);
-    %dv_theta = H*(dv_theta./Hs);
+    dc_theta = H*(dc_theta./Hs);
+    dv_theta = H*(dv_theta./Hs);
     % Filter gradients (NEW)
     % dgtw_dx     = H*(dgtw_dx./Hs);
-    %dgtw_dtheta = H*(dgtw_dtheta./Hs);
+    dgtw_dtheta = H*(dgtw_dtheta./Hs);
     % New sensitivities for Heaviside
     % dc_dx   = H*((dc_dx   .* dxphy)./Hs);
     % dv_dx   = H*((dv_dx   .* dxphy)./Hs);
@@ -146,6 +147,7 @@ while change > 1e-3 && iter < maxiter
     dc_dx   = H * (dc_dx_chain   ./ Hs);
     dv_dx   = H * (dv_dx_chain   ./ Hs);
     dgtw_dx = H * (dgtw_dx_chain ./ Hs);
+
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Objective function sensitivities
     dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
@@ -177,7 +179,10 @@ while change > 1e-3 && iter < maxiter
     % xphy=xval; 
     %xphy(1:numele) =     (H*xval(1:numele))./Hs; % old density filter 
     %xphy(numele+1:end) = (H*xval(numele+1:end))./Hs; % theta
-    xphy(numele+1:end) = xval(numele+1:end);
+    % xphy(numele+1:end) = xval(numele+1:end); % No spatial filtering
+    p1 = cos(xval(numele+1:end));
+    p2 = sin(xval(numele+1:end));
+    xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
     % xval=xphy; 
 
     % Print results
@@ -192,24 +197,24 @@ while change > 1e-3 && iter < maxiter
     % patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
     %       'FaceColor','flat','EdgeColor',[0,0,0]); axis equal off; colorbar
     % clim([0 1]);  drawnow;
-    % if mod(iter, 5) == 0 || iter == 1
-    %     figure(1); clf;
-    %     patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
-    %           'FaceColor','flat','EdgeColor','none'); 
-    %     axis equal tight off; colormap(flipud(gray)); colorbar;
-    %     hold on;
-    %     ind = find(xphy(1:numele) > 0.2); % Only show fibers where there is material
-    %     theta_curr = xphy(numele+1:end);
-    %     x_plot = [x_cen(ind) - halfL*cos(theta_curr(ind)), ...
-    %               x_cen(ind) + halfL*cos(theta_curr(ind)), ...
-    %               nan(length(ind),1)]';
-    %     y_plot = [y_cen(ind) - halfL*sin(theta_curr(ind)), ...
-    %               y_cen(ind) + halfL*sin(theta_curr(ind)), ...
-    %               nan(length(ind),1)]';
-    %     line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-    %     title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_tw));
-    %     drawnow;
-    % end
+    if mod(iter, 5) == 0 || iter == 1
+        figure(1); clf;
+        patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
+              'FaceColor','flat','EdgeColor','none'); 
+        axis equal tight off; colormap(flipud(gray)); colorbar;
+        hold on;
+        ind = find(xphy(1:numele) > 0.2); % Only show fibers where there is material
+        theta_curr = xphy(numele+1:end);
+        x_plot = [x_cen(ind) - halfL*cos(theta_curr(ind)), ...
+                  x_cen(ind) + halfL*cos(theta_curr(ind)), ...
+                  nan(length(ind),1)]';
+        y_plot = [y_cen(ind) - halfL*sin(theta_curr(ind)), ...
+                  y_cen(ind) + halfL*sin(theta_curr(ind)), ...
+                  nan(length(ind),1)]';
+        line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
+        title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_tw));
+        drawnow;
+    end
     % Beta continuation block
     if mod(iter, 100) == 0 && beta < beta_max
         beta = min(beta*2, beta_max);
