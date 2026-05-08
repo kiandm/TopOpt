@@ -8,7 +8,7 @@ warning off
 %% Parameters
 volfrac = 0.4;                                   % Volume fraction
 penal = 3.0;                                     % Penalization factor
-rmin = 3;                                      % Filter radius
+rmin = 3;                                        % Filter radius
 maxiter = 500;
 beta     = 1;                                    % Initial sharpness
 beta_max = 32;                                   % Maximum sharpness
@@ -20,7 +20,7 @@ matprop.nu12=0.26;                               % Major Poisson's ratio
 matprop.nu21=matprop.nu12*matprop.E2/matprop.E1; % Minor Poisson's ratio
 matprop.G12=4.2e3;                               % Shear modulus
 % Strength allowables for Tsai-Wu
-strength.Xt=1062;                                %
+strength.Xt=1062;                                
 strength.Xc=610; 
 strength.Yt=31; 
 strength.Yc=118; 
@@ -43,7 +43,7 @@ for i=1:numele
     end
 end
 % Initialize design variables and combine
-x = volfrac * ones(numele,1);              % Density variables
+x = volfrac * ones(numele,1);                % Density variables
 % theta = (pi/2) * ones(numele,1);           % Fiber direction variables
 %% 
 % Principal stress initialisation for theta
@@ -58,7 +58,7 @@ matprop.G12 = matprop.E1 / (2*(1 + matprop.nu12));
 x_iso = volfrac * ones(numele,1);
 theta_iso = zeros(numele,1); 
 xval_iso = [x_iso; theta_iso];
-% Run ONE FE analysis (penal = 1 for linear solve)
+% Run one FE analysis (penal = 1 for linear solve)
 [U_iso, K_iso, KE0_iso] = FE_analysis(xval_iso, 1.0, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
 % Calculate stress directions
 [~, stressDirection] = calculatePrincipalStress(U_iso, numele, gs, edofMat, coords, conn, matprop);
@@ -110,91 +110,52 @@ iterationHistory = zeros(maxiter, 5);
 change = 1; iter = 0;
 while change > 1e-3 && iter < maxiter
     iter = iter + 1;
-
     % Heaviside projection
     x_tilde = (H*xval(1:numele))./Hs;
     [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
     xphy(1:numele) = x_proj;
-
     % FE Analysis (Extracting K and KE0 too now for TW)
     [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-    
     % Tsai-Wu constraint (NEW)
     %[g_tw, dgtw_dx_raw, dgtw_dtheta, TW, TW_gp, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     [g_tw, dgtw_dx_raw, dgtw_dtheta, TW, vonMises] = Copy_of_TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     % Objective function and sensitivities
-    [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);
-    
+    [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);   
     % Volume constraint and sensitivities
-    [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve);
-    
+    [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve);    
     % filtering of sensitivites
-    % dc_dx = H*(dc_dx./Hs);
-    % dv_dx = H*(dv_dx./Hs);
     dc_theta = H*(dc_theta./Hs);
     dv_theta = H*(dv_theta./Hs);
-    % Filter gradients (NEW)
-    % dgtw_dx     = H*(dgtw_dx./Hs);
-    dgtw_dtheta = H*(dgtw_dtheta./Hs);
-    % New sensitivities for Heaviside
-    % dc_dx   = H*((dc_dx   .* dxphy)./Hs);
-    % dv_dx   = H*((dv_dx   .* dxphy)./Hs);
-    % dgtw_dx = H*((dgtw_dx .* dxphy)./Hs);
-    
+    dgtw_dtheta = H*(dgtw_dtheta./Hs);    
     dc_dx_chain   = dc_dx_raw   .* dxphy;
     dv_dx_chain   = dv_dx_raw   .* dxphy;
     dgtw_dx_chain = dgtw_dx_raw .* dxphy;
     dc_dx   = H * (dc_dx_chain   ./ Hs);
     dv_dx   = H * (dv_dx_chain   ./ Hs);
     dgtw_dx = H * (dgtw_dx_chain ./ Hs);
-
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Objective function sensitivities
     dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
             dgtw_dx(:).',     dgtw_dtheta(:).' ];  % Combined constraint sensitivities 
-
     % Initial values for MMA
     f0val = c;             % Initial objective function value
-    fval = [v; g_tw];      % Initial volume constraint value
-    
-    % fprintf('m = %d, n = %d\n', m, n);
-    % disp(size(fval))
-    % disp(size(dfdx))
-    % disp(size(a))
-    % disp(size(c_MMA))
-    % disp(size(d))
-
+    fval = [v; g_tw];      % Initial volume constraint value    
     % MMA update
     [xmma, ~, ~, ~, ~, ~, ~, ~, ~, low1, upp1] = mmasub(m, n, iter, xval, xmin,...
         xmax, xold1, xold2, f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d);
-    low=low1;
-    upp=upp1;
-    % Update old values
-    xold2 = xold1; 
-    xold1 = xval;
-    %current values of the design variables
-    xval = xmma;
-    
-    % %filter design variables both density and 
-    % xphy=xval; 
-    % xphy(numele+1:end) = xval(numele+1:end); % No spatial filtering
-    p1 = cos(xval(numele+1:end));
-    p2 = sin(xval(numele+1:end));
+    low=low1;      upp=upp1;
+    xold2 = xold1; xold1 = xval; % Update old values
+    xval = xmma;                 % current values of the design variables
+    % %filter theta with Cartesian components
+    p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
     xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
-    % xval=xphy; 
-
     % Print results
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
     change = max(change_x, change_t);
     fprintf('It %d: Obj = %f, V = %f, g_tw = %f, Change = %f\n', iter, c, v, g_tw, change);
     iterationHistory(iter, :) = [iter, c, v, change, g_tw];
-
     % Plot design (x and theta)
-    % colormap(jet);
-    % patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
-    %       'FaceColor','flat','EdgeColor',[0,0,0]); axis equal off; colorbar
-    % clim([0 1]);  drawnow;
     if mod(iter, 5) == 0 || iter == 1
         figure(1); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
@@ -217,11 +178,6 @@ while change > 1e-3 && iter < maxiter
     if mod(iter, 100) == 0 && beta < beta_max
         beta = min(beta*2, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
-        % Reset MMA internal state to prevent spikes
-        %xold1 = xval;
-        %xold2 = xval;
-        %low   = max(0, xval - move);
-        %upp   = min(1, xval + move);
     end
 end
 warning on
@@ -232,12 +188,10 @@ M1 = nGrey / numele;
 M2 = sum(4 * x .* (1 - x))/n;
 disp(M1) % percentage of elements with density between 0.05<x<0.95
 disp(M2) % percentage of average greyness (i.e. design is M2% grey )
-
 % plot angles
 % Update design variables
 x = xphy(1:numele);
 theta = xphy(numele+1:end);
-
 figure(2)
 patch('Faces',conn','Vertices',coords','FaceVertexCData',x,...
       'FaceColor','flat','EdgeColor','none'); colorbar; %axis equal off;
@@ -245,23 +199,18 @@ axis equal; hold on
 len=0.05; 
 u_len=len*cos(theta); 
 v_len=len*sin(theta); 
-
 ind = find(x > 0.5);        % only plot in solid regions
-
 for k = 1:length(ind)
     e = ind(k);
     theta_e = theta(e);
-
     x1 = x_cen(e) - halfL*cos(theta_e);
     x2 = x_cen(e) + halfL*cos(theta_e);
     y1 = y_cen(e) - halfL*sin(theta_e);
     y2 = y_cen(e) + halfL*sin(theta_e);
-
     line([x1 x2], [y1 y2], ...
          'Color','k', ...
          'LineWidth',1.2);
 end
-
 % von Mises and Tsai-Wu stress plots
 figure(3);
 mask = xphy(1:numele) < 0.3;
@@ -273,7 +222,6 @@ patch('Faces', conn', 'Vertices', coords', ...
 axis equal off; colorbar;
 set(gcf, 'Color', 'white')
 title('von Mises stress');
-
 figure(4); clf;
 field_plot2 = TW;
 field_plot2(mask) = NaN;
@@ -288,7 +236,6 @@ colorbar;
 clim([0 1.2]);   % 1 = failure limit
 title(sprintf('Tsai–Wu Index (iteration %d)', iter));
 drawnow;
-
 % plot iteration convergence history
 figure(5);
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
@@ -296,6 +243,3 @@ xlabel('Iteration');
 ylabel('Objective Function (Compliance)');
 title('Convergence History');
 grid on;
-
-
-

@@ -49,7 +49,7 @@ for i=1:numele
 end
 % Initialise design variables and combine
 x = volfrac * ones(numele,1);              % Density variables
-theta = (0) * ones(numele,1);           % Fiber direction variables (not using anymore)
+theta = (pi/4) * ones(numele,1);           % Fiber direction variables (not using anymore)
 %% 
 % % Principal stress initialisation for theta
 % fprintf('Calculating initial fiber directions via isotropic solve...\n');
@@ -114,16 +114,15 @@ while change > 1e-3 && iter < maxiter
     % FE Analysis (Extracting K and KE0 too now for TW)
     % [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);    
     
+    % Anisotropy continuation
     alpha = min(1.0, iter / alpha_ramp_end); % Linear
     % alpha = 1 / (1 + exp(-10 * (iter/alpha_ramp_end - 0.5))); % Sigmoid
-
     matprop_c           = matprop;
     matprop_c.E1        = E_iso + alpha * (matprop.E1  - E_iso);
     matprop_c.E2        = E_iso + alpha * (matprop.E2  - E_iso);   % stays E_iso, shown for clarity
     matprop_c.G12      = G_iso + alpha * (matprop.G12 - G_iso);
     matprop_c.nu12     = nu_iso + alpha * (matprop.nu12 - nu_iso);
     matprop_c.nu21     = matprop_c.nu12 * matprop_c.E2 / matprop_c.E1;
-
     [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop_c);
 
 
