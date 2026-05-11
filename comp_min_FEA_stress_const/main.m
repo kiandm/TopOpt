@@ -68,31 +68,31 @@ end
 
 
 % Initialize design variables
-x = volfrac * ones(numele,1); % Density variables
-% x = 1 * ones(numele,1); % Density variables
-%theta = 0 * ones(numele,1); % Fiber direction variables
+%x = volfrac * ones(numele,1); % Density variables
+x = 1 * ones(numele,1); % Density variables
+theta = (pi/2) * ones(numele,1); % Fiber direction variables
 %%
-% Principal stress initialisation for theta
-fprintf('Calculating initial fiber directions via isotropic solve...\n');
-% Temporarily store original properties
-matprop_true = matprop;
-% Set material properties to isotropic
-matprop.E1 = 1000; matprop.E2 = 1000;
-matprop.nu12 = 0.3; matprop.nu21 = 0.3;
-matprop.G12 = matprop.E1 / (2*(1 + matprop.nu12));
-% Set a uniform density and dummy theta for the solve
-x_iso = volfrac * ones(numele,1);
-theta_iso = zeros(numele,1); 
-xval_iso = [x_iso; theta_iso];
-% Run ONE FE analysis (penal = 1 for linear solve)
-[U_iso, K_iso] = FE_analysis(xval_iso, 1.0, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-% Calculate stress directions
-[~, stressDirection] = calculatePrincipalStress(U_iso, numele, gs, edofMat, coords, conn, matprop);
-% Assign result to actual theta and restore properties
-theta = stressDirection;
-% xval(numele+1:end) = theta;  
-matprop = matprop_true; % Restore real composite properties
-fprintf('Initial theta assigned. Starting optimisation loop...\n');
+% % Principal stress initialisation for theta
+% fprintf('Calculating initial fiber directions via isotropic solve...\n');
+% % Temporarily store original properties
+% matprop_true = matprop;
+% % Set material properties to isotropic
+% matprop.E1 = 1000; matprop.E2 = 1000;
+% matprop.nu12 = 0.3; matprop.nu21 = 0.3;
+% matprop.G12 = matprop.E1 / (2*(1 + matprop.nu12));
+% % Set a uniform density and dummy theta for the solve
+% x_iso = volfrac * ones(numele,1);
+% theta_iso = zeros(numele,1); 
+% xval_iso = [x_iso; theta_iso];
+% % Run ONE FE analysis (penal = 1 for linear solve)
+% [U_iso, K_iso] = FE_analysis(xval_iso, 1.0, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+% % Calculate stress directions
+% [~, stressDirection] = calculatePrincipalStress(U_iso, numele, gs, edofMat, coords, conn, matprop);
+% % Assign result to actual theta and restore properties
+% theta = stressDirection;
+% % xval(numele+1:end) = theta;  
+% matprop = matprop_true; % Restore real composite properties
+% fprintf('Initial theta assigned. Starting optimisation loop...\n');
 %%
 % Combine design variables
 xval = [x; theta];

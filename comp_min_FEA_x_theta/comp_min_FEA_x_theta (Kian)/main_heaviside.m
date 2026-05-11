@@ -175,7 +175,7 @@ while change > 1e-3 && iter < maxiter
         drawnow;
     end
     % Beta continuation block
-    if mod(iter, 100) == 0 && beta < beta_max
+    if mod(iter, 50) == 0 && beta < beta_max
         beta = min(beta*2, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end

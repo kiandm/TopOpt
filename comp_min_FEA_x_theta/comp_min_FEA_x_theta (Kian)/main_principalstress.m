@@ -2,7 +2,8 @@
 % By Zahur Ullah 21/5/2025 and edited to add stress-constraint by Kian Das 20/4/2026
 % Here it is optimising both density and theta for a fibre-reinforced composite in 2D
 % No Heaviside + initial guess for theta based on principal stresses
-clear; clc; close all; 
+clear; clc; 
+% close all; 
 warning off
 %% Parameters
 volfrac = 0.4; % Volume fraction
@@ -150,7 +151,7 @@ while change > 1e-3 && iter < maxiter
     iterationHistory(iter, :) = [iter, c, v, change, g_tw];
     % Live plotting
     if mod(iter, 5) == 0 || iter == 1
-        figure(5); clf;
+        figure(6); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
@@ -200,7 +201,7 @@ theta = xphy(numele+1:end);
 %          'LineWidth',1.2);
 % end
 % von Mises and Tsai-Wu stress plots
-figure(6);
+figure(7);
 mask = xphy(1:numele) < 0.3;
 field_plot1 = vonMises;
 field_plot1(mask) = NaN;
@@ -210,7 +211,7 @@ patch('Faces', conn', 'Vertices', coords', ...
 axis equal off; colorbar;
 set(gcf, 'Color', 'white')
 title('von Mises stress');
-figure(7); clf;
+figure(8); clf;
 field_plot2 = TW;
 field_plot2(mask) = NaN;
 patch('Faces', conn', ...
@@ -225,7 +226,7 @@ clim([0 1.2]);   % 1 = failure limit
 title(sprintf('Tsai–Wu Index (iteration %d)', iter));
 drawnow;
 % plot iteration convergence history
-figure(8);
+figure(9);
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
 xlabel('Iteration');
 ylabel('Objective Function (Compliance)');

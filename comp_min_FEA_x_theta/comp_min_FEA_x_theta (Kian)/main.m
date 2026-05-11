@@ -2,7 +2,7 @@
 % By Zahur Ullah 21/5/2025 and edited to add stress-constraint by Kian Das 20/4/2026
 % Here it is optimising both density and theta for a fibre-reinforced composite in 2D
 % No Heaviside
-%clear; clc; close all; 
+clear; clc; close all; 
 warning off
 %% Parameters
 volfrac = 0.4; % Volume fraction
@@ -43,7 +43,8 @@ for i=1:numele
 end
 % Initialize design variables and combine
 x = volfrac * ones(numele,1);              % Density variables
-theta = (pi/4) * ones(numele,1);           % Fiber direction variables (0, +-pi/2, +-pi/4)
+% x = ones(numele,1);
+theta = (pi/2) * ones(numele,1);           % Fiber direction variables (0, +-pi/2, +-pi/4)
 xval = [x; theta];                         % Combine design variables
 % Bounds for densities and fiber directions
 xmin_x = 1e-4 * ones(numele,1); % Lower bound for densities
@@ -102,11 +103,11 @@ while change > 1e-3 && iter < maxiter
     % filtering of sensitivites
     dc_dx = H*(dc_dx./Hs);
     dv_dx = H*(dv_dx./Hs);
-    %dc_theta = H*(dc_theta./Hs);
-    %dv_theta = H*(dv_theta./Hs);
+    dc_theta = H*(dc_theta./Hs);
+    dv_theta = H*(dv_theta./Hs);
     % Filter gradients (NEW)
     dgtw_dx     = H*(dgtw_dx./Hs);
-    %dgtw_dtheta = H*(dgtw_dtheta./Hs);
+    dgtw_dtheta = H*(dgtw_dtheta./Hs);
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Objective function sensitivities
     dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
@@ -130,7 +131,10 @@ while change > 1e-3 && iter < maxiter
     % %filter design variables both density and 
     % xphy=xval; 
     xphy(1:numele) =     (H*xval(1:numele))./Hs; % old density filter 
-    xphy(numele+1:end) = xval(numele+1:end);
+    % xphy(numele+1:end) = (H*xval(numele+1:end))./Hs;
+    
+    %p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+    %xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
     % xval=xphy; 
 
     % Print results
