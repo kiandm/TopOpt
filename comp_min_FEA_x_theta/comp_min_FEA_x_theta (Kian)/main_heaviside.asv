@@ -3,13 +3,13 @@
 % Here it is optimising both density and theta for a fibre-reinforced composite in 2D
 % With Heaviside
 clear; clc; 
-%close all;
+close all;
 warning off
 %% Parameters
 volfrac = 0.4;                                   % Volume fraction
 penal = 3.0;                                     % Penalization factor
-rmin = 2;                                        % Filter radius
-maxiter = 500;
+rmin = 3;                                        % Filter radius
+maxiter = 750;
 beta     = 1;                                    % Initial sharpness
 beta_max = 32;                                   % Maximum sharpness
 eta      = 0.5;                                  % Threshold (0.5 = standard, increase to erode, decrease to dilate)
@@ -45,7 +45,6 @@ end
 % Initialize design variables and combine
 x = volfrac * ones(numele,1);                % Density variables
 % theta = (pi/2) * ones(numele,1);           % Fiber direction variables
-% theta = (0) + ((pi)-(0)).*rand(numele,1); % Random initialisation (0,pi)
 %% 
 % Principal stress initialisation for theta
 fprintf('Calculating initial fiber directions via isotropic solve...\n');
@@ -73,9 +72,8 @@ xval = [x; theta];                         % Combine design variables
 % Bounds for densities and fiber directions
 xmin_x = 1e-4 * ones(numele,1); % Lower bound for densities
 xmax_x = 1 * ones(numele,1); % Upper bound for densities
-epsilon = 1e-6;
-xmin_theta = (0+epsilon) * ones(numele,1); % Lower bound for fiber directions
-xmax_theta =  (pi) * ones(numele,1); % Upper bound for fiber directions
+xmin_theta = -(pi/2) * ones(numele,1); % Lower bound for fiber directions
+xmax_theta =  (pi/2) * ones(numele,1); % Upper bound for fiber directions
 %%
 % INITIALIZE MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
@@ -119,7 +117,7 @@ while change > 1e-3 && iter < maxiter
     % FE Analysis (Extracting K and KE0 too now for TW)
     [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
     % Tsai-Wu constraint (NEW)
-    [g_tw, dgtw_dx_raw, dgtw_dtheta, TW, ~, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+    [g_tw, dgtw_dx_raw, dgtw_dtheta, TW, TW_gp, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     %[g_tw, dgtw_dx_raw, dgtw_dtheta, TW, vonMises] = Copy_of_TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     % Objective function and sensitivities
     [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);   
@@ -133,7 +131,7 @@ while change > 1e-3 && iter < maxiter
     % Reworking theta sensitivites for atan2 filter
     c_bar = cos(xphy(numele+1:end)); s_bar = sin(xphy(numele+1:end));
     r2 = max(c_bar.^2 + s_bar.^2, 1e-6);
-    Gamma = cos(xval(numele+1:end) - xphy(numele+1:end)) ./ r2;
+    Gamma = cos(xval(numele+1:end) - xphy(numele+1:end) ./ r2;
     dc_theta = H * ((Gamma .* dc_theta) ./ Hs);
     dv_theta = H * ((Gamma .* dv_theta) ./ Hs);
     dgtw_dtheta = H * ((Gamma .* dgtw_dtheta) ./ Hs);
@@ -160,7 +158,6 @@ while change > 1e-3 && iter < maxiter
     % %filter theta with Cartesian components
     p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
     xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
-    % xphy(numele+1:end) = (H*xval(numele+1:end))./Hs;
     % Print results
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
@@ -169,7 +166,7 @@ while change > 1e-3 && iter < maxiter
     iterationHistory(iter, :) = [iter, c, v, change, g_tw];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 1
-        figure(11); clf;
+        figure(1); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
@@ -204,7 +201,7 @@ disp(M2) % percentage of average greyness (i.e. design is M2% grey )
 % Update design variables
 x = xphy(1:numele);
 theta = xphy(numele+1:end);
-figure(12)
+figure(2)
 patch('Faces',conn','Vertices',coords','FaceVertexCData',x,...
       'FaceColor','flat','EdgeColor','none'); colorbar; %axis equal off;
 axis equal; hold on 
@@ -224,7 +221,7 @@ for k = 1:length(ind)
          'LineWidth',1.2);
 end
 % von Mises and Tsai-Wu stress plots
-figure(13);
+figure(3);
 mask = xphy(1:numele) < 0.3;
 field_plot1 = vonMises;
 field_plot1(mask) = NaN;
@@ -234,7 +231,7 @@ patch('Faces', conn', 'Vertices', coords', ...
 axis equal off; colorbar;
 set(gcf, 'Color', 'white')
 title('von Mises stress');
-figure(14); clf;
+figure(4); clf;
 field_plot2 = TW;
 field_plot2(mask) = NaN;
 patch('Faces', conn', ...
@@ -249,7 +246,7 @@ clim([0 1.2]);   % 1 = failure limit
 title(sprintf('Tsai–Wu Index (iteration %d)', iter));
 drawnow;
 % plot iteration convergence history
-figure(15);
+figure(5);
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
 xlabel('Iteration');
 ylabel('Objective Function (Compliance)');

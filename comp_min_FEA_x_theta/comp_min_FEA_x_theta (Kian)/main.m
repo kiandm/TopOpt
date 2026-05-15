@@ -103,11 +103,19 @@ while change > 1e-3 && iter < maxiter
     % filtering of sensitivites
     dc_dx = H*(dc_dx./Hs);
     dv_dx = H*(dv_dx./Hs);
-    dc_theta = H*(dc_theta./Hs);
-    dv_theta = H*(dv_theta./Hs);
+    %dc_theta = H*(dc_theta./Hs);
+    %dv_theta = H*(dv_theta./Hs);
     % Filter gradients (NEW)
     dgtw_dx     = H*(dgtw_dx./Hs);
-    dgtw_dtheta = H*(dgtw_dtheta./Hs);
+    %dgtw_dtheta = H*(dgtw_dtheta./Hs);
+
+    c_bar = cos(xphy(numele+1:end)); s_bar = sin(xphy(numele+1:end));
+    r2 = max(c_bar.^2 + s_bar.^2, 1e-6);
+    Gamma = cos(xval(numele+1:end) - xphy(numele+1:end)) ./ r2;
+    dc_theta = H * ((Gamma .* dc_theta) ./ Hs);
+    dv_theta = H * ((Gamma .* dv_theta) ./ Hs);
+    dgtw_dtheta = H * ((Gamma .* dgtw_dtheta) ./ Hs);
+
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Objective function sensitivities
     dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
@@ -131,10 +139,8 @@ while change > 1e-3 && iter < maxiter
     % %filter design variables both density and 
     % xphy=xval; 
     xphy(1:numele) =     (H*xval(1:numele))./Hs; % old density filter 
-    % xphy(numele+1:end) = (H*xval(numele+1:end))./Hs;
-    
-    %p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-    %xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+    p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+    xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
     % xval=xphy; 
 
     % Print results

@@ -40,7 +40,13 @@ function [principalStress, stressDirection] = calculatePrincipalStress(U, numele
         % Principal Stress Angle
         % theta_p = 0.5 * atan( 2*tau_xy / (sigma_x - sigma_y) )
         % use atan2 to handle the quadrants safely
-        stressDirection(e) = 0.5 * atan2(2*sxy, sx - sy);
+        % stressDirection(e) = 0.5 * atan2(2*sxy, sx - sy);
+        % Change limits to (o,pi) from (-pi/2,pi/2)
+        theta_raw = 0.5 * atan2(2*sxy, sx - sy);
+        epsilon = 1e-10;
+        theta_min = 0; theta_max = pi;
+        theta_mapped = theta_min + mod(theta_raw - theta_min, pi);
+        stressDirection(e) = max(theta_min + epsilon, min(theta_max - epsilon, theta_mapped));
         
         % Major Principal Stress Magnitude (for reference)
         principalStress(e) = (sx + sy)/2 + sqrt(((sx - sy)/2)^2 + sxy^2);

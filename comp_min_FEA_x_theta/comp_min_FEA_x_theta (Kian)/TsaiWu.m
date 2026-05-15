@@ -90,7 +90,7 @@ for e = 1:numele
             TW_gp = F1*s1 + F2*s2 + ...
                     F11*s1^2 + F22*s2^2 + ...
                     F66*t12^2 + 2*F12*s1*s2;
-            TW_e = TW_e + TW_gp / 4; % * wt * jac;
+            TW_e = TW_e + TW_gp * wt * jac; % / 4
 
             % adjoint RHS (local) 
             psi = [ F1  + 2*F11*s1 + 2*F12*s2;
@@ -121,7 +121,7 @@ for e = 1:numele
 end
 
 % p‑norm aggregation
-p = 8; % 8 16 32
+p = 16; % 8 16 32
 TWp  = (sum(TW.^p))^(1/p);
 g_tw = TWp - 1;
 fac = (TW.^(p-1)) / (TWp^(p-1)); % numele *

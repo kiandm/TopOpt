@@ -80,7 +80,7 @@ nodes_trac=find(coords(2,:)==40 & coords(1,:)>95);
 % nodes_trac=find(coords(1,:)==100 & coords(2,:)>=30); 
 coords_trac=coords(:,nodes_trac); 
 
-pres=-50; % -50
+pres=-50; % -50 for ndiv=100, -100 for ndiv=50
 F=zeros(2*numnode,1); 
 
 %Traction boundary (point load)
