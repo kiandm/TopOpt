@@ -8,10 +8,10 @@ warning off
 %% Parameters
 volfrac = 0.4;                                   % Volume fraction
 penal = 3.0;                                     % Penalization factor
-rmin = 2;                                        % Filter radius
+rmin = 3;                                        % Filter radius
 maxiter = 500;
-beta     = 1;                                    % Initial sharpness
-beta_max = 32;                                   % Maximum sharpness
+beta     = 0.5;                                    % Initial sharpness
+beta_max = 16;                                   % Maximum sharpness
 eta      = 0.5;                                  % Threshold (0.5 = standard, increase to erode, decrease to dilate)
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -44,37 +44,37 @@ for i=1:numele
 end
 % Initialize design variables and combine
 x = volfrac * ones(numele,1);                % Density variables
-% theta = (pi/2) * ones(numele,1);           % Fiber direction variables
+theta = (0) * ones(numele,1);           % Fiber direction variables
 % theta = (0) + ((pi)-(0)).*rand(numele,1); % Random initialisation (0,pi)
 %% 
 % Principal stress initialisation for theta
-fprintf('Calculating initial fiber directions via isotropic solve...\n');
-% Temporarily store original properties
-matprop_true = matprop;
-% Set material properties to isotropic
-matprop.E1 = 1000; matprop.E2 = 1000;
-matprop.nu12 = 0.3; matprop.nu21 = 0.3;
-matprop.G12 = matprop.E1 / (2*(1 + matprop.nu12));
-% Set a uniform density and dummy theta for the solve
-x_iso = volfrac * ones(numele,1);
-theta_iso = zeros(numele,1); 
-xval_iso = [x_iso; theta_iso];
-% Run one FE analysis (penal = 1 for linear solve)
-[U_iso, K_iso, KE0_iso] = FE_analysis(xval_iso, 1.0, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-% Calculate stress directions
-[~, stressDirection] = calculatePrincipalStress(U_iso, numele, gs, edofMat, coords, conn, matprop);
-% Assign result to actual theta and restore properties
-theta = stressDirection;
-% xval(numele+1:end) = theta;  
-matprop = matprop_true; % Restore real composite properties
-fprintf('Initial theta assigned. Starting optimisation loop...\n');
+% fprintf('Calculating initial fiber directions via isotropic solve...\n');
+% % Temporarily store original properties
+% matprop_true = matprop;
+% % Set material properties to isotropic
+% matprop.E1 = 1000; matprop.E2 = 1000;
+% matprop.nu12 = 0.3; matprop.nu21 = 0.3;
+% matprop.G12 = matprop.E1 / (2*(1 + matprop.nu12));
+% % Set a uniform density and dummy theta for the solve
+% x_iso = volfrac * ones(numele,1);
+% theta_iso = zeros(numele,1); 
+% xval_iso = [x_iso; theta_iso];
+% % Run one FE analysis (penal = 1 for linear solve)
+% [U_iso, K_iso, KE0_iso] = FE_analysis(xval_iso, 1.0, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+% % Calculate stress directions
+% [~, stressDirection] = calculatePrincipalStress(U_iso, numele, gs, edofMat, coords, conn, matprop);
+% % Assign result to actual theta and restore properties
+% theta = stressDirection;
+% % xval(numele+1:end) = theta;  
+% matprop = matprop_true; % Restore real composite properties
+% fprintf('Initial theta assigned. Starting optimisation loop...\n');
 %%
 xval = [x; theta];                         % Combine design variables
 % Bounds for densities and fiber directions
 xmin_x = 1e-4 * ones(numele,1); % Lower bound for densities
 xmax_x = 1 * ones(numele,1); % Upper bound for densities
 epsilon = 1e-6;
-xmin_theta = (0+epsilon) * ones(numele,1); % Lower bound for fiber directions
+xmin_theta = (0) * ones(numele,1); % Lower bound for fiber directions
 xmax_theta =  (pi) * ones(numele,1); % Upper bound for fiber directions
 %%
 % INITIALIZE MMA OPTIMIZER
@@ -168,8 +168,8 @@ while change > 1e-3 && iter < maxiter
     fprintf('It %d: Obj = %f, V = %f, g_tw = %f, Change = %f\n', iter, c, v, g_tw, change);
     iterationHistory(iter, :) = [iter, c, v, change, g_tw];
     % Plot design (x and theta)
-    if mod(iter, 5) == 0 || iter == 1
-        figure(11); clf;
+    if mod(iter, 5) == 0 || iter == 0
+        figure(1); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
@@ -187,7 +187,7 @@ while change > 1e-3 && iter < maxiter
         drawnow;
     end
     % Beta continuation block
-    if mod(iter, 50) == 0 && beta < beta_max
+    if mod(iter, 40) == 0 && beta < beta_max
         beta = min(beta*2, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
@@ -195,16 +195,17 @@ end
 warning on
 %%
 % Measure of non-discreteness (NEW)
+x = xphy(1:numele);
 nGrey = sum(x > 0.05 & x < 0.95);
-M1 = nGrey / numele;
-M2 = sum(4 * x .* (1 - x))/n;
+M1 = 100 * nGrey / numele;
+M2 = 100 * sum(4 * x .* (1 - x))/n;
 disp(M1) % percentage of elements with density between 0.05<x<0.95
 disp(M2) % percentage of average greyness (i.e. design is M2% grey )
 % plot angles
 % Update design variables
-x = xphy(1:numele);
+
 theta = xphy(numele+1:end);
-figure(12)
+figure(2)
 patch('Faces',conn','Vertices',coords','FaceVertexCData',x,...
       'FaceColor','flat','EdgeColor','none'); colorbar; %axis equal off;
 axis equal; hold on 
@@ -224,7 +225,7 @@ for k = 1:length(ind)
          'LineWidth',1.2);
 end
 % von Mises and Tsai-Wu stress plots
-figure(13);
+figure(3);
 mask = xphy(1:numele) < 0.3;
 field_plot1 = vonMises;
 field_plot1(mask) = NaN;
@@ -234,7 +235,7 @@ patch('Faces', conn', 'Vertices', coords', ...
 axis equal off; colorbar;
 set(gcf, 'Color', 'white')
 title('von Mises stress');
-figure(14); clf;
+figure(4); clf;
 field_plot2 = TW;
 field_plot2(mask) = NaN;
 patch('Faces', conn', ...
@@ -249,9 +250,17 @@ clim([0 1.2]);   % 1 = failure limit
 title(sprintf('Tsai–Wu Index (iteration %d)', iter));
 drawnow;
 % plot iteration convergence history
-figure(15);
+figure(5); clf;
+yyaxis left
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
 xlabel('Iteration');
 ylabel('Objective Function (Compliance)');
+
+yyaxis right
+plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'Color', 'r');
+ylabel('Tsai-Wu Index, g_{tw}');
+ax = gca;
+ax.YAxis(2).Color = 'r';
+
 title('Convergence History');
 grid on;

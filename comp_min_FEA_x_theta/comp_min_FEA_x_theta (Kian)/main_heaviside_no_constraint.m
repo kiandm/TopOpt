@@ -3,14 +3,14 @@
 % Here it is optimising both density and theta for a fibre-reinforced composite in 2D
 % With Heaviside
 clear; clc; 
-close all;
+%close all;
 warning off
 %% Parameters
 volfrac = 0.4;                                   % Volume fraction
 penal = 3.0;                                     % Penalization factor
 rmin = 3;                                        % Filter radius
-maxiter = 750;
-beta     = 1;                                    % Initial sharpness
+maxiter = 500;
+beta     = 0.5;                                    % Initial sharpness
 beta_max = 32;                                   % Maximum sharpness
 eta      = 0.5;                                  % Threshold (0.5 = standard, increase to erode, decrease to dilate)
 %Material properties composites (from Guowei Ma)
@@ -44,40 +44,42 @@ for i=1:numele
 end
 % Initialize design variables and combine
 x = volfrac * ones(numele,1);                % Density variables
-% theta = (pi/2) * ones(numele,1);           % Fiber direction variables
+theta = (3*pi/4) * ones(numele,1);           % Fiber direction variables
+% theta = (0) + ((pi)-(0)).*rand(numele,1); % Random initialisation (0,pi)
 %% 
 % Principal stress initialisation for theta
-fprintf('Calculating initial fiber directions via isotropic solve...\n');
-% Temporarily store original properties
-matprop_true = matprop;
-% Set material properties to isotropic
-matprop.E1 = 1000; matprop.E2 = 1000;
-matprop.nu12 = 0.3; matprop.nu21 = 0.3;
-matprop.G12 = matprop.E1 / (2*(1 + matprop.nu12));
-% Set a uniform density and dummy theta for the solve
-x_iso = volfrac * ones(numele,1);
-theta_iso = zeros(numele,1); 
-xval_iso = [x_iso; theta_iso];
-% Run one FE analysis (penal = 1 for linear solve)
-[U_iso, K_iso, KE0_iso] = FE_analysis(xval_iso, 1.0, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-% Calculate stress directions
-[~, stressDirection] = calculatePrincipalStress(U_iso, numele, gs, edofMat, coords, conn, matprop);
-% Assign result to actual theta and restore properties
-theta = stressDirection;
-% xval(numele+1:end) = theta;  
-matprop = matprop_true; % Restore real composite properties
-fprintf('Initial theta assigned. Starting optimisation loop...\n');
+% fprintf('Calculating initial fiber directions via isotropic solve...\n');
+% % Temporarily store original properties
+% matprop_true = matprop;
+% % Set material properties to isotropic
+% matprop.E1 = 1000; matprop.E2 = 1000;
+% matprop.nu12 = 0.3; matprop.nu21 = 0.3;
+% matprop.G12 = matprop.E1 / (2*(1 + matprop.nu12));
+% % Set a uniform density and dummy theta for the solve
+% x_iso = volfrac * ones(numele,1);
+% theta_iso = zeros(numele,1); 
+% xval_iso = [x_iso; theta_iso];
+% % Run one FE analysis (penal = 1 for linear solve)
+% [U_iso, K_iso, KE0_iso] = FE_analysis(xval_iso, 1.0, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+% % Calculate stress directions
+% [~, stressDirection] = calculatePrincipalStress(U_iso, numele, gs, edofMat, coords, conn, matprop);
+% % Assign result to actual theta and restore properties
+% theta = stressDirection;
+% % xval(numele+1:end) = theta;  
+% matprop = matprop_true; % Restore real composite properties
+% fprintf('Initial theta assigned. Starting optimisation loop...\n');
 %%
 xval = [x; theta];                         % Combine design variables
 % Bounds for densities and fiber directions
 xmin_x = 1e-4 * ones(numele,1); % Lower bound for densities
 xmax_x = 1 * ones(numele,1); % Upper bound for densities
-xmin_theta = -(pi/2) * ones(numele,1); % Lower bound for fiber directions
-xmax_theta =  (pi/2) * ones(numele,1); % Upper bound for fiber directions
+epsilon = 1e-6;
+xmin_theta = (0) * ones(numele,1); % Lower bound for fiber directions
+xmax_theta =  (pi) * ones(numele,1); % Upper bound for fiber directions
 %%
 % INITIALIZE MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
-m     = 2;                          % The number of general constraints.
+m     = 1;                          % The number of general constraints.
 n     = numel(xval);                % The number of design variables x_j.
 xmin  = [xmin_x; xmin_theta];       % Column vector with the lower bounds for the variables x_j.
 xmax  = [xmax_x; xmax_theta];       % Column vector with the upper bounds for the variables x_j.
@@ -117,7 +119,7 @@ while change > 1e-3 && iter < maxiter
     % FE Analysis (Extracting K and KE0 too now for TW)
     [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
     % Tsai-Wu constraint (NEW)
-    [g_tw, dgtw_dx_raw, dgtw_dtheta, TW, TW_gp, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+    [g_tw, dgtw_dx_raw, dgtw_dtheta, TW, ~, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     %[g_tw, dgtw_dx_raw, dgtw_dtheta, TW, vonMises] = Copy_of_TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     % Objective function and sensitivities
     [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);   
@@ -131,7 +133,7 @@ while change > 1e-3 && iter < maxiter
     % Reworking theta sensitivites for atan2 filter
     c_bar = cos(xphy(numele+1:end)); s_bar = sin(xphy(numele+1:end));
     r2 = max(c_bar.^2 + s_bar.^2, 1e-6);
-    Gamma = cos(xval(numele+1:end) - xphy(numele+1:end) ./ r2;
+    Gamma = cos(xval(numele+1:end) - xphy(numele+1:end)) ./ r2;
     dc_theta = H * ((Gamma .* dc_theta) ./ Hs);
     dv_theta = H * ((Gamma .* dv_theta) ./ Hs);
     dgtw_dtheta = H * ((Gamma .* dgtw_dtheta) ./ Hs);
@@ -144,11 +146,10 @@ while change > 1e-3 && iter < maxiter
     dgtw_dx = H * (dgtw_dx_chain ./ Hs);
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Objective function sensitivities
-    dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
-            dgtw_dx(:).',     dgtw_dtheta(:).' ];  % Combined constraint sensitivities 
+    dfdx = [ dv_dx(:).',      dv_theta(:).'];  % Combined constraint sensitivities 
     % Initial values for MMA
     f0val = c;             % Initial objective function value
-    fval = [v; g_tw];      % Initial volume constraint value    
+    fval = v;      % Initial volume constraint value    
     % MMA update
     [xmma, ~, ~, ~, ~, ~, ~, ~, ~, low1, upp1] = mmasub(m, n, iter, xval, xmin,...
         xmax, xold1, xold2, f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d);
@@ -158,15 +159,16 @@ while change > 1e-3 && iter < maxiter
     % %filter theta with Cartesian components
     p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
     xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+    % xphy(numele+1:end) = (H*xval(numele+1:end))./Hs;
     % Print results
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
     change = max(change_x, change_t);
-    fprintf('It %d: Obj = %f, V = %f, g_tw = %f, Change = %f\n', iter, c, v, g_tw, change);
+    fprintf('It %d: Obj = %f, V = %f, g_tw (unconstrained) = %f, Change = %f\n', iter, c, v, g_tw, change);
     iterationHistory(iter, :) = [iter, c, v, change, g_tw];
     % Plot design (x and theta)
-    if mod(iter, 5) == 0 || iter == 1
-        figure(1); clf;
+    if mod(iter, 5) == 0 || iter == 0
+        figure(6); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
@@ -192,16 +194,17 @@ end
 warning on
 %%
 % Measure of non-discreteness (NEW)
+x = xphy(1:numele);
 nGrey = sum(x > 0.05 & x < 0.95);
-M1 = nGrey / numele;
-M2 = sum(4 * x .* (1 - x))/n;
+M1 = 100 * nGrey / numele;
+M2 = 100 * sum(4 * x .* (1 - x))/n;
 disp(M1) % percentage of elements with density between 0.05<x<0.95
 disp(M2) % percentage of average greyness (i.e. design is M2% grey )
 % plot angles
 % Update design variables
-x = xphy(1:numele);
+
 theta = xphy(numele+1:end);
-figure(2)
+figure(7)
 patch('Faces',conn','Vertices',coords','FaceVertexCData',x,...
       'FaceColor','flat','EdgeColor','none'); colorbar; %axis equal off;
 axis equal; hold on 
@@ -221,7 +224,7 @@ for k = 1:length(ind)
          'LineWidth',1.2);
 end
 % von Mises and Tsai-Wu stress plots
-figure(3);
+figure(8);
 mask = xphy(1:numele) < 0.3;
 field_plot1 = vonMises;
 field_plot1(mask) = NaN;
@@ -231,7 +234,7 @@ patch('Faces', conn', 'Vertices', coords', ...
 axis equal off; colorbar;
 set(gcf, 'Color', 'white')
 title('von Mises stress');
-figure(4); clf;
+figure(9); clf;
 field_plot2 = TW;
 field_plot2(mask) = NaN;
 patch('Faces', conn', ...
@@ -246,9 +249,17 @@ clim([0 1.2]);   % 1 = failure limit
 title(sprintf('Tsai–Wu Index (iteration %d)', iter));
 drawnow;
 % plot iteration convergence history
-figure(5);
+figure(10); clf;
+yyaxis left
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
 xlabel('Iteration');
 ylabel('Objective Function (Compliance)');
+
+yyaxis right
+plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'Color', 'r');
+ylabel('Tsai-Wu Index, g_{tw}');
+ax = gca;
+ax.YAxis(2).Color = 'r';
+
 title('Convergence History');
 grid on;

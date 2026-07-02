@@ -44,30 +44,30 @@ for i=1:numele
 end
 % Initialize design variables and combine
 x = volfrac * ones(numele,1);                % Density variables
-% theta = (pi/2) * ones(numele,1);           % Fiber direction variables
+theta = (pi/4) * ones(numele,1);           % Fiber direction variables
 % theta = (0) + ((pi)-(0)).*rand(numele,1); % Random initialisation (0,pi)
 %% 
-% Principal stress initialisation for theta
-fprintf('Calculating initial fiber directions via isotropic solve...\n');
-% Temporarily store original properties
-matprop_true = matprop;
-% Set material properties to isotropic
-matprop.E1 = 1000; matprop.E2 = 1000;
-matprop.nu12 = 0.3; matprop.nu21 = 0.3;
-matprop.G12 = matprop.E1 / (2*(1 + matprop.nu12));
-% Set a uniform density and dummy theta for the solve
-x_iso = volfrac * ones(numele,1);
-theta_iso = zeros(numele,1); 
-xval_iso = [x_iso; theta_iso];
-% Run one FE analysis (penal = 1 for linear solve)
-[U_iso, K_iso, KE0_iso] = FE_analysis(xval_iso, 1.0, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-% Calculate stress directions
-[~, stressDirection] = calculatePrincipalStress(U_iso, numele, gs, edofMat, coords, conn, matprop);
-% Assign result to actual theta and restore properties
-theta = stressDirection;
-% xval(numele+1:end) = theta;  
-matprop = matprop_true; % Restore real composite properties
-fprintf('Initial theta assigned. Starting optimisation loop...\n');
+% % Principal stress initialisation for theta
+% fprintf('Calculating initial fiber directions via isotropic solve...\n');
+% % Temporarily store original properties
+% matprop_true = matprop;
+% % Set material properties to isotropic
+% matprop.E1 = 1000; matprop.E2 = 1000;
+% matprop.nu12 = 0.3; matprop.nu21 = 0.3;
+% matprop.G12 = matprop.E1 / (2*(1 + matprop.nu12));
+% % Set a uniform density and dummy theta for the solve
+% x_iso = volfrac * ones(numele,1);
+% theta_iso = zeros(numele,1); 
+% xval_iso = [x_iso; theta_iso];
+% % Run one FE analysis (penal = 1 for linear solve)
+% [U_iso, K_iso, KE0_iso] = FE_analysis(xval_iso, 1.0, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+% % Calculate stress directions
+% [~, stressDirection] = calculatePrincipalStress(U_iso, numele, gs, edofMat, coords, conn, matprop);
+% % Assign result to actual theta and restore properties
+% theta = stressDirection;
+% % xval(numele+1:end) = theta;  
+% matprop = matprop_true; % Restore real composite properties
+% fprintf('Initial theta assigned. Starting optimisation loop...\n');
 %%
 xval = [x; theta];                         % Combine design variables
 % Bounds for densities and fiber directions
@@ -128,109 +128,125 @@ dgtw_dx_filt_fd  = H * (dgtw_dx_chain_fd ./ Hs);
 dc_dth_filt_fd   = H * (dc_theta_fd      ./ Hs);
 dgtw_dth_filt_fd = H * (dgtw_dth_fd      ./ Hs);
 % Generate elements to be sampled
-check_elems = unique([1, numele, round(linspace(1, numele, 15))]); % Pick 15 elements evenly spaced
-h_fd = 1e-5;
-% Element loops to calculate perturbed values
-% 1. dc/dx
-fprintf('\n--- dc/dx: Compliance sensitivity w.r.t. density ---\n');
-for e = check_elems
-   xval_pos = xval; xval_neg = xval;
-   xval_pos(e) = xval(e) + h_fd;
-   xval_neg(e) = xval(e) - h_fd;
-   xphy_pos = apply_filter_and_projection(xval_pos, numele, H, Hs, beta, eta);
-   xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
-   [U_pos, ~, ~] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-   [U_neg, ~, ~] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-   [c_pos, ~, ~] = objective_function(U_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop);
-   [c_neg, ~, ~] = objective_function(U_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop);
-   dc_dx_fd_num = (c_pos - c_neg) / (2 * h_fd);
-   dc_dx_analytic = dc_dx_filt_fd(e);
-   abs_err = abs(dc_dx_fd_num - dc_dx_analytic);
-   rel_err = abs_err / (abs(dc_dx_analytic) + 1e-14);
-   fprintf('%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dc_dx_analytic, dc_dx_fd_num, abs_err, rel_err);
+check_elems = unique([1, numele, round(linspace(1, numele, 10))]); % Pick 20 elements evenly spaced
+%h_fd = 1e-6;
+count = 0;
+for h_fd = [1e-4 1e-5 1e-6 1e-7 1e-8]
+    count = count + 1;
+    filename = ['finitediffoutput_' num2str(count) '.txt'];
+    fileID = fopen(filename, 'w');
+    % Element loops to calculate perturbed values
+    % 3. dg_tw/dx
+    fprintf(fileID, '%s', '\n--- dgtw/dx: Tsai-Wu sensitivity w.r.t. density ---\n');
+    for e = check_elems
+       xval_pos = xval; xval_neg = xval;
+       xval_pos(e) = xval(e) + h_fd;
+       xval_neg(e) = xval(e) - h_fd;
+       xphy_pos = apply_filter_and_projection(xval_pos, numele, H, Hs, beta, eta);
+       xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
+       [U_pos, K_pos, KE0_pos] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+       [U_neg, K_neg, KE0_neg] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+       [g_pos, ~, ~, ~, ~, ~] = TsaiWu(U_pos, K_pos, KE0_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+       [g_neg, ~, ~, ~, ~, ~] = TsaiWu(U_neg, K_neg, KE0_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);   
+       dgtw_dx_fd_num = (g_pos - g_neg) / (2 * h_fd);
+       dgtw_dx_analytic = dgtw_dx_filt_fd(e);
+       abs_err = abs(dgtw_dx_fd_num - dgtw_dx_analytic);
+       rel_err = abs_err / (abs(dgtw_dx_analytic) + 1e-14);
+       fprintf(fileID, '%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dgtw_dx_analytic, dgtw_dx_fd_num, abs_err, rel_err);
+    end
+    % 4. dg_tw/dtheta
+    fprintf(fileID, '%s', '\n--- dgtw/dtheta: Tsai-Wu sensitivity w.r.t. fibre angle ---\n');
+    for e = check_elems
+       xval_pos = xval; xval_neg = xval;
+       xval_pos(numele + e) = xval(numele + e) + h_fd;
+       xval_neg(numele + e) = xval(numele + e) - h_fd;
+       xphy_pos = apply_filter_and_projection(xval_pos, numele, H, Hs, beta, eta);
+       xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
+       [U_pos, K_pos, KE0_pos] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+       [U_neg, K_neg, KE0_neg] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+       [g_pos, ~, ~, ~, ~, ~] = TsaiWu(U_pos, K_pos, KE0_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+       [g_neg, ~, ~, ~, ~, ~] = TsaiWu(U_neg, K_neg, KE0_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);   
+       dgtw_dth_fd_num = (g_pos - g_neg) / (2 * h_fd);
+       dgtw_dth_analytic = dgtw_dth_filt_fd(e);
+       abs_err = abs(dgtw_dth_fd_num - dgtw_dth_analytic);
+       rel_err = abs_err / (abs(dgtw_dth_analytic) + 1e-14);
+       fprintf(fileID, '%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dgtw_dth_analytic, dgtw_dth_fd_num, abs_err, rel_err);
+    end
+    % 1. dc/dx
+    fprintf(fileID, '%s', '\n--- dc/dx: Compliance sensitivity w.r.t. density ---\n');
+    fprintf(fileID, '%s' ,'Element', 'Analytic value', 'Numeric value', 'Abs. err', 'Rel. err');
+    for e = check_elems
+       xval_pos = xval; xval_neg = xval;
+       xval_pos(e) = xval(e) + h_fd;
+       xval_neg(e) = xval(e) - h_fd;
+       xphy_pos = apply_filter_and_projection(xval_pos, numele, H, Hs, beta, eta);
+       xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
+       [U_pos, ~, ~] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+       [U_neg, ~, ~] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+       [c_pos, ~, ~] = objective_function(U_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop);
+       [c_neg, ~, ~] = objective_function(U_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop);
+       dc_dx_fd_num = (c_pos - c_neg) / (2 * h_fd);
+       dc_dx_analytic = dc_dx_filt_fd(e);
+       abs_err = abs(dc_dx_fd_num - dc_dx_analytic);
+       rel_err = abs_err / (abs(dc_dx_analytic) + 1e-14);
+       fprintf(fileID,'%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dc_dx_analytic, dc_dx_fd_num, abs_err, rel_err);
+    end
+    % 2. dc/dtheta
+    fprintf(fileID,'%s','\n--- dc/dtheta: Compliance sensitivity w.r.t. fibre angle ---\n');
+    for e = check_elems
+       xval_pos = xval; xval_neg = xval;
+       xval_pos(numele + e) = xval(numele + e) + h_fd;
+       xval_neg(numele + e) = xval(numele + e) - h_fd;
+       xphy_pos = apply_filter_and_projection(xval_pos, numele, H, Hs, beta, eta);
+       xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
+       [U_pos, ~, ~] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+       [U_neg, ~, ~] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+       [c_pos, ~, ~] = objective_function(U_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop);
+       [c_neg, ~, ~] = objective_function(U_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop);
+       dc_dth_fd_num = (c_pos - c_neg) / (2 * h_fd);
+       dc_dth_analytic = dc_dth_filt_fd(e);
+       abs_err = abs(dc_dth_fd_num - dc_dth_analytic);
+       rel_err = abs_err / (abs(dc_dth_analytic) + 1e-14);
+       fprintf(fileID, '%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dc_dth_analytic, dc_dth_fd_num, abs_err, rel_err);
+    end
+    
+    
+    % % Add markers to plot indicating sampled elements from check_elems
+    % figure(1); clf;
+    % % Plot the background domain mesh so you can see the layout
+    % patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
+    %       'FaceColor','flat','EdgeColor','k','EdgeAlpha',0.15); 
+    % axis equal tight; colormap(flipud(gray)); colorbar;
+    % hold on;
+    % % 1. Plot high-visibility markers at the centroids of the sampled elements
+    % plot(x_cen(check_elems), y_cen(check_elems), 'rs', ...
+    %      'MarkerSize', 10, ...
+    %      'LineWidth', 2, ...
+    %      'MarkerFaceColor', 'y'); % Yellow squares with red borders
+    % % 2. Add text labels so you can match the plot to the command window printout
+    % for i = 1:length(check_elems)
+    %     e = check_elems(i);
+    %     text(x_cen(e), y_cen(e), sprintf(' #%d', e), ...
+    %          'Color', 'blue', ...
+    %          'FontSize', 9, ...
+    %          'FontWeight', 'bold', ...
+    %          'HorizontalAlignment', 'left', ...
+    %          'VerticalAlignment', 'middle');
+    % end
+    % 
+    % title('Finite Difference Sensitivity Verification: Sampled Elements');
+    % hold off;
+    % drawnow;
+    
+    % e_test = 3752;
+    % fprintf('Element %d: x_cen=%.2f, y_cen=%.2f\n', e_test, x_cen(e_test), y_cen(e_test));
+    % nodes = conn(:, e_test);
+    % xe = coords(1, nodes); ye = coords(2, nodes);
+    % dN = 0.25*[-1 1 1 -1; -1 -1 1 1];
+    % J = [dN(1,:)*xe', dN(1,:)*ye'; dN(2,:)*xe', dN(2,:)*ye'];
+    % fprintf('det(J) = %.6f\n', det(J));
+    fclose(fileID);
 end
-% 2. dc/dtheta
-fprintf('\n--- dc/dtheta: Compliance sensitivity w.r.t. fibre angle ---\n');
-for e = check_elems
-   xval_pos = xval; xval_neg = xval;
-   xval_pos(numele + e) = xval(numele + e) + h_fd;
-   xval_neg(numele + e) = xval(numele + e) - h_fd;
-   xphy_pos = apply_filter_and_projection(xval_pos, numele, H, Hs, beta, eta);
-   xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
-   [U_pos, ~, ~] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-   [U_neg, ~, ~] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-   [c_pos, ~, ~] = objective_function(U_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop);
-   [c_neg, ~, ~] = objective_function(U_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop);
-   dc_dth_fd_num = (c_pos - c_neg) / (2 * h_fd);
-   dc_dth_analytic = dc_dth_filt_fd(e);
-   abs_err = abs(dc_dth_fd_num - dc_dth_analytic);
-   rel_err = abs_err / (abs(dc_dth_analytic) + 1e-14);
-   fprintf('%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dc_dth_analytic, dc_dth_fd_num, abs_err, rel_err);
-end
-% 3. dg_tw/dx
-fprintf('\n--- dgtw/dx: Tsai-Wu sensitivity w.r.t. density ---\n');
-for e = check_elems
-   xval_pos = xval; xval_neg = xval;
-   xval_pos(e) = xval(e) + h_fd;
-   xval_neg(e) = xval(e) - h_fd;
-   xphy_pos = apply_filter_and_projection(xval_pos, numele, H, Hs, beta, eta);
-   xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
-   [U_pos, K_pos, KE0_pos] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-   [U_neg, K_neg, KE0_neg] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-   [g_pos, ~, ~, ~, ~, ~] = TsaiWu(U_pos, K_pos, KE0_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
-   [g_neg, ~, ~, ~, ~, ~] = TsaiWu(U_neg, K_neg, KE0_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);   
-   dgtw_dx_fd_num = (g_pos - g_neg) / (2 * h_fd);
-   dgtw_dx_analytic = dgtw_dx_filt_fd(e);
-   abs_err = abs(dgtw_dx_fd_num - dgtw_dx_analytic);
-   rel_err = abs_err / (abs(dgtw_dx_analytic) + 1e-14);
-   fprintf('%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dgtw_dx_analytic, dgtw_dx_fd_num, abs_err, rel_err);
-end
-% 4. dg_tw/dtheta
-fprintf('\n--- dgtw/dtheta: Tsai-Wu sensitivity w.r.t. fibre angle ---\n');
-for e = check_elems
-   xval_pos = xval; xval_neg = xval;
-   xval_pos(numele + e) = xval(numele + e) + h_fd;
-   xval_neg(numele + e) = xval(numele + e) - h_fd;
-   xphy_pos = apply_filter_and_projection(xval_pos, numele, H, Hs, beta, eta);
-   xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
-   [U_pos, K_pos, KE0_pos] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-   [U_neg, K_neg, KE0_neg] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
-   [g_pos, ~, ~, ~, ~, ~] = TsaiWu(U_pos, K_pos, KE0_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
-   [g_neg, ~, ~, ~, ~, ~] = TsaiWu(U_neg, K_neg, KE0_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);   
-   dgtw_dth_fd_num = (g_pos - g_neg) / (2 * h_fd);
-   dgtw_dth_analytic = dgtw_dth_filt_fd(e);
-   abs_err = abs(dgtw_dth_fd_num - dgtw_dth_analytic);
-   rel_err = abs_err / (abs(dgtw_dth_analytic) + 1e-14);
-   fprintf('%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dgtw_dth_analytic, dgtw_dth_fd_num, abs_err, rel_err);
-end
-% Add markers to plot indicating sampled elements from check_elems
-figure(16); clf;
-% Plot the background domain mesh so you can see the layout
-patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
-      'FaceColor','flat','EdgeColor','k','EdgeAlpha',0.15); 
-axis equal tight; colormap(flipud(gray)); colorbar;
-hold on;
-
-% 1. Plot high-visibility markers at the centroids of the sampled elements
-plot(x_cen(check_elems), y_cen(check_elems), 'rs', ...
-     'MarkerSize', 10, ...
-     'LineWidth', 2, ...
-     'MarkerFaceColor', 'y'); % Yellow squares with red borders
-
-% 2. Add text labels so you can match the plot to the command window printout
-for i = 1:length(check_elems)
-    e = check_elems(i);
-    text(x_cen(e), y_cen(e), sprintf(' #%d', e), ...
-         'Color', 'blue', ...
-         'FontSize', 9, ...
-         'FontWeight', 'bold', ...
-         'HorizontalAlignment', 'left', ...
-         'VerticalAlignment', 'middle');
-end
-
-title('Finite Difference Sensitivity Verification: Sampled Elements');
-hold off;
-drawnow;
 pause;
 %% Optimisation loop
 iterationHistory = zeros(maxiter, 5);
@@ -294,7 +310,7 @@ while change > 1e-3 && iter < maxiter
     iterationHistory(iter, :) = [iter, c, v, change, g_tw];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 1
-        figure(11); clf;
+        figure(2); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
@@ -329,37 +345,37 @@ disp(M2) % percentage of average greyness (i.e. design is M2% grey )
 % Update design variables
 x = xphy(1:numele);
 theta = xphy(numele+1:end);
-figure(12)
-patch('Faces',conn','Vertices',coords','FaceVertexCData',x,...
-      'FaceColor','flat','EdgeColor','none'); colorbar; %axis equal off;
-axis equal; hold on 
-len=0.05; 
-u_len=len*cos(theta); 
-v_len=len*sin(theta); 
-ind = find(x > 0.5);        % only plot in solid regions
-for k = 1:length(ind)
-    e = ind(k);
-    theta_e = theta(e);
-    x1 = x_cen(e) - halfL*cos(theta_e);
-    x2 = x_cen(e) + halfL*cos(theta_e);
-    y1 = y_cen(e) - halfL*sin(theta_e);
-    y2 = y_cen(e) + halfL*sin(theta_e);
-    line([x1 x2], [y1 y2], ...
-         'Color','k', ...
-         'LineWidth',1.2);
-end
-% von Mises and Tsai-Wu stress plots
-figure(13);
+% figure(12)
+% patch('Faces',conn','Vertices',coords','FaceVertexCData',x,...
+%       'FaceColor','flat','EdgeColor','none'); colorbar; %axis equal off;
+% axis equal; hold on 
+% len=0.05; 
+% u_len=len*cos(theta); 
+% v_len=len*sin(theta); 
+% ind = find(x > 0.5);        % only plot in solid regions
+% for k = 1:length(ind)
+%     e = ind(k);
+%     theta_e = theta(e);
+%     x1 = x_cen(e) - halfL*cos(theta_e);
+%     x2 = x_cen(e) + halfL*cos(theta_e);
+%     y1 = y_cen(e) - halfL*sin(theta_e);
+%     y2 = y_cen(e) + halfL*sin(theta_e);
+%     line([x1 x2], [y1 y2], ...
+%          'Color','k', ...
+%          'LineWidth',1.2);
+% end
+% % von Mises and Tsai-Wu stress plots
+% figure(13);
 mask = xphy(1:numele) < 0.3;
-field_plot1 = vonMises;
-field_plot1(mask) = NaN;
-patch('Faces', conn', 'Vertices', coords', ...
-      'FaceVertexCData', field_plot1, ...
-      'FaceColor','flat','EdgeColor','none');
-axis equal off; colorbar;
-set(gcf, 'Color', 'white')
-title('von Mises stress');
-figure(14); clf;
+% field_plot1 = vonMises;
+% field_plot1(mask) = NaN;
+% patch('Faces', conn', 'Vertices', coords', ...
+%       'FaceVertexCData', field_plot1, ...
+%       'FaceColor','flat','EdgeColor','none');
+% axis equal off; colorbar;
+% set(gcf, 'Color', 'white')
+% title('von Mises stress');
+figure(3); clf;
 field_plot2 = TW;
 field_plot2(mask) = NaN;
 patch('Faces', conn', ...
@@ -374,7 +390,7 @@ clim([0 1.2]);   % 1 = failure limit
 title(sprintf('Tsai–Wu Index (iteration %d)', iter));
 drawnow;
 % plot iteration convergence history
-figure(15);
+figure(4);
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
 xlabel('Iteration');
 ylabel('Objective Function (Compliance)');

@@ -74,7 +74,8 @@ for e = 1:numele
                           sin(2*theta), -sin(2*theta),  2*cos(2*theta);
                           cos(2*theta), -cos(2*theta), -2*sin(2*theta)];
             dCxy_dth = dTinv_dth * C0 * Tinv' + Tinv * C0 * dTinv_dth';
-            dKE_dth = dKE_dth + jac * wt * B' * dCxy_dth * B;
+            % dKE_dth = dKE_dth + jac * wt * B' * dCxy_dth * B;
+            dKE_dth = dKE_dth + (xdens^penal) * jac * wt * B' * dCxy_dth * B;
 
             % Strain/stress
             eps_l = T_eps * (B * Ue);
@@ -100,16 +101,16 @@ for e = 1:numele
             % DENSITY SENSITIVITY (Chain Rule: dTW/dsig * dsig/dx)
             dsig_dx = q * xdens^(q-1) * sig_unscaled;
             dTWdx_gp = psi' * dsig_dx;
-            dTWdx_e = dTWdx_e + dTWdx_gp / 4;
+            dTWdx_e = dTWdx_e + dTWdx_gp * wt * jac;
 
             % derivative of T_eps with respect to theta
             dT_eps_dth = [-sin(2*theta),  sin(2*theta),   cos(2*theta);
                            sin(2*theta), -sin(2*theta),  -cos(2*theta);
                           -2*cos(2*theta), 2*cos(2*theta), -2*sin(2*theta)];          
             dTW_dth_gp = psi' * (xdens^q * C0 * dT_eps_dth * (B * Ue));
-            dTW_dth_e  = dTW_dth_e + dTW_dth_gp / 4;            
+            dTW_dth_e  = dTW_dth_e + dTW_dth_gp *wt * jac;            
             fadj_gp = B' * T_eps' * C0' * psi * xdens^q;
-            fadj_e = fadj_e + fadj_gp / 4;
+            fadj_e = fadj_e + fadj_gp * wt * jac;
         end
     end
 
@@ -121,7 +122,7 @@ for e = 1:numele
 end
 
 % p‑norm aggregation
-p = 16; % 8 16 32
+p = 8; % 8 16 32
 TWp  = (sum(TW.^p))^(1/p);
 g_tw = TWp - 1;
 fac = (TW.^(p-1)) / (TWp^(p-1)); % numele *
@@ -145,9 +146,12 @@ for e = 1:numele
     Ue = U(edofMat(e,:));
     le = lambda(edofMat(e,:));
     Ke0 = KE0{e};
+    % dK_dx = penal * xdens^(penal-1) * KE0_e
     dgtw_dx(e) = fac(e)*dTWdx(e) ...
                - (penal/xdens) * (le' * Ke0 * Ue);
+    % dgtw_dtheta(e) = fac(e) * dTWdth(e) ...
+                   %- xdens^penal * (le' * dKE0th{e} * Ue);
     dgtw_dtheta(e) = fac(e) * dTWdth(e) ...
-                   - xdens^penal * (le' * dKE0th{e} * Ue);
+                   - (le' * dKE0th{e} * Ue);
 end
 end
