@@ -1,1 +1,0 @@
-\n--- dgtw/dx: Tsai-Wu sensitivity w.r.t. density ---\n1        -8.483930e-01  -5.795309e-01  2.688620e-01   3.17e-01  
