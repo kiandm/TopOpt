@@ -6,8 +6,8 @@ clear; clc;
 close all;
 warning off
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin = 3; maxiter = 500; theta_init = pi/2;
-beta = 1; beta_max = 32; eta = 0.5;
+volfrac = 0.4; penal = 3.0; rmin = 3; maxiter = 1000; theta_init = pi/2;
+beta = 1; beta_max = 32tr; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
 matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction
@@ -146,7 +146,7 @@ while change > 1e-3 && iter < maxiter
     fprintf('It %d: Obj = %f, V = %f, g_tw = %f, Change = %f, Change in x = %f, Change in theta = %f\n', iter, c, v, g_tw, change, change_x, change_t);
     iterationHistory(iter, :) = [iter, c, v, change, g_tw];
     % Plot design (x and theta)
-    if mod(iter, 5) == 0 || iter == 0
+    if mod(iter, 1000) == 0 || iter == 0
         figure(1); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
@@ -208,6 +208,7 @@ y_lines = [y_cen(ind) - halfL*sin(theta_rad(ind)), ... % Fixed: y_cen instead of
 line(x_lines(:), y_lines(:), 'Color', [0 0 0 0.5], 'LineWidth', 0.8); % Overlay fiber direction vector lines
 % Tsai-Wu failure plot
 figure(3); clf;
+mask = xphy(1:numele) < 0.3;
 field_plot2 = TW;
 field_plot2(mask) = NaN;
 patch('Faces', conn', ...

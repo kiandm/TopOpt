@@ -6,7 +6,7 @@ clear; clc;
 close all;
 warning off
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin = 3; maxiter = 500; theta_init = pi/2;
+volfrac = 0.4; penal = 3.0; rmin = 3; maxiter = 1000; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -14,7 +14,7 @@ matprop.E2=8.4e3;                                % Young's modulus perpendicular
 matprop.nu12=0.26;                               % Major Poisson's ratio
 matprop.nu21=matprop.nu12*matprop.E2/matprop.E1; % Minor Poisson's ratio
 matprop.G12=4.2e3;                               % Shear modulus
-% Strength allowables for Tsai-Wu
+% Strength allowables for Hashin
 strength.Xt=1062;                                
 strength.Xc=610; 
 strength.Yt=31; 
@@ -91,7 +91,9 @@ while change > 1e-3 && iter < maxiter
     % FE Analysis
     [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
     % Tsai-Wu constraint
-    [g_tw, dgtw_dx_raw, dgtw_dtheta, TW, ~, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+    %[g_tw, dgtw_dx_raw, dgtw_dtheta, TW, ~, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+    % Hashin constraint
+    [g_hs, dgh_dx_raw, dgh_dtheta, TW, ~, vonMises] = Hashin(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     % Objective function and sensitivities
     [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);   
     % Volume constraint and sensitivities
@@ -110,25 +112,25 @@ while change > 1e-3 && iter < maxiter
               + cos(xval(numele+1:end)) .* (H * (dc_dp2 ./ Hs));
     % dv_dtheta is zero anyway since volume doesn't depend on fibre
     % direction
-    dgtw_dp1 = dgtw_dtheta .* dtheta_dp1;
-    dgtw_dp2 = dgtw_dtheta .* dtheta_dp2;
-    dgtw_dtheta = -sin(xval(numele+1:end)) .* (H * (dgtw_dp1 ./ Hs)) ...
-                 + cos(xval(numele+1:end)) .* (H * (dgtw_dp2 ./ Hs));
+    dgh_dp1 = dgh_dtheta .* dtheta_dp1;
+    dgh_dp2 = dgh_dtheta .* dtheta_dp2;
+    dgh_dtheta = -sin(xval(numele+1:end)) .* (H * (dgh_dp1 ./ Hs)) ...
+                 + cos(xval(numele+1:end)) .* (H * (dgh_dp2 ./ Hs));
     % sensitivites in x
     dc_dx_chain   = dc_dx_raw   .* dxphy; % Chain rule
     dv_dx_chain   = dv_dx_raw   .* dxphy; % Chain rule
-    dgtw_dx_chain = dgtw_dx_raw .* dxphy; % Chain rule
+    dgh_dx_chain = dgh_dx_raw .* dxphy; % Chain rule
     dc_dx   = H * (dc_dx_chain   ./ Hs);  % Filter
     dv_dx   = H * (dv_dx_chain   ./ Hs);  % Filter
-    dgtw_dx = H * (dgtw_dx_chain ./ Hs);  % Filter
+    dgh_dx = H * (dgh_dx_chain ./ Hs);  % Filter
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Combined objective function sensitivities
     dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
-            dgtw_dx(:).',     dgtw_dtheta(:).' ];  % Combined constraint sensitivities 
+            dgh_dx(:).',     dgh_dtheta(:).' ];  % Combined constraint sensitivities 
  %%
     % Initial values for MMA
     f0val = c;             % Initial objective function value
-    fval = [v; g_tw];      % Initial volume constraint value    
+    fval = [v; g_hs];      % Initial volume constraint value    
     % MMA update
     [xmma, ~, ~, ~, ~, ~, ~, ~, ~, low1, upp1] = mmasub(m, n, iter, xval, xmin,...
         xmax, xold1, xold2, f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d);
@@ -143,8 +145,8 @@ while change > 1e-3 && iter < maxiter
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
     change = max(change_x, change_t);
-    fprintf('It %d: Obj = %f, V = %f, g_tw = %f, Change = %f, Change in x = %f, Change in theta = %f\n', iter, c, v, g_tw, change, change_x, change_t);
-    iterationHistory(iter, :) = [iter, c, v, change, g_tw];
+    fprintf('It %d: Obj = %f, V = %f, g_hs = %f, Change = %f, Change in x = %f, Change in theta = %f\n', iter, c, v, g_hs, change, change_x, change_t);
+    iterationHistory(iter, :) = [iter, c, v, change, g_hs];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 0
         figure(1); clf;
@@ -161,7 +163,7 @@ while change > 1e-3 && iter < maxiter
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_tw));
+        title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_hs));
         drawnow;
     end
     % Beta continuation block
@@ -174,7 +176,7 @@ warning on
 %%
 % Measure of non-discreteness
 x = xphy(1:numele);
-M = 100 * sum(4 * x .* (1 - x))/n;
+M = 100 * sum(4 * x .* (1 - x))/numele;
 disp(M) % percentage of average greyness (i.e. design is M2% grey )
 % Plot orientation
 theta_rad = xphy(numele+1:end);
@@ -206,8 +208,9 @@ y_lines = [y_cen(ind) - halfL*sin(theta_rad(ind)), ... % Fixed: y_cen instead of
            y_cen(ind) + halfL*sin(theta_rad(ind)), ...
            nan(length(ind),1)]';
 line(x_lines(:), y_lines(:), 'Color', [0 0 0 0.5], 'LineWidth', 0.8); % Overlay fiber direction vector lines
-% Tsai-Wu failure plot
+% Hashin failure plot
 figure(3); clf;
+mask = xphy(1:numele) < 0.3;
 field_plot2 = TW;
 field_plot2(mask) = NaN;
 patch('Faces', conn', ...
@@ -219,7 +222,7 @@ set(gcf, 'Color', 'white')
 axis equal off;
 colorbar;
 clim([0 1.2]);   % 1 = failure limit
-title(sprintf('Tsai–Wu Index (iteration %d)', iter));
+title(sprintf('Hashin Index (iteration %d)', iter));
 drawnow;
 % plot iteration convergence history
 figure(4); clf;
@@ -229,7 +232,7 @@ xlabel('Iteration');
 ylabel('Objective Function (Compliance)');
 yyaxis right
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'Color', 'r');
-ylabel('Tsai-Wu Index, g_{tw}');
+ylabel('Hashin Index, g_{hs}');
 ax = gca;
 ax.YAxis(2).Color = 'r';
 title('Convergence History');
