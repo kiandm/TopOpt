@@ -20,10 +20,10 @@ function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat
     ndof = 2 * numnode;
 
     % Initialize global stiffness matrix and force vector
-    % K = sparse(ndof, ndof); % (OLD)
+    % K = sparse(ndof, ndof);
     % F = sparse(ndof, 1);
     KE0 = cell(numele,1);
-    KE_all = zeros(8,8,numele); % (NEW)
+    KE_all = zeros(8,8,numele);
 
     gcount=0; 
     for ee=1:numele
@@ -58,21 +58,14 @@ function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat
         KE_all(:,:,ee) = KE; % (NEW)
     end 
     % Vectorised sparse assembly (NEW)
-    iK = reshape(kron(edofMat, ones(8,1))',64*numele,1);
-    jK = reshape(kron(edofMat, ones(1,8))',64*numele,1);
-    sK = reshape(KE_all,64*numele,1);
-    K = sparse(iK,jK,sK,ndof,ndof);
-    K = (K+K')/2; % symmetrize away floating-point round-off from summed duplicates
-    % Factorize once and reuse for both the primal solve below and the
-    % adjoint solve in Hashin.m (same K, so this avoids a second full
-    % factorization every iteration).
-    Kff = K(freedofs,freedofs);
-    dK  = decomposition(Kff,'chol');
+    iK = 
+    jK = 
+    sK = 
+    K = 
 
     % Solve the system
     U = zeros(ndof, 1);
-    % U(freedofs) = K(freedofs, freedofs) \ F(freedofs); % (OLD)
-    U(freedofs) = dK \ F(freedofs);
+    U(freedofs) = K(freedofs, freedofs) \ F(freedofs);
 
 
     % figure

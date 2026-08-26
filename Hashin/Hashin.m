@@ -1,5 +1,5 @@
 function [g_h, dgh_dx, dgh_dtheta, HashinIdx, HashinIdx_gp, vonMises] = Hashin( ...
-    U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs)
+    U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs)
 % Classical (non-mode-separated) Hashin stress constraint with adjoint sensitivities
 % Fibre and matrix modes combined per Gauss point via KS smooth-max;
 % tension/compression within each mode gated via sigmoid (differentiable Macaulay).
@@ -9,9 +9,9 @@ function [g_h, dgh_dx, dgh_dtheta, HashinIdx, HashinIdx_gp, vonMises] = Hashin( 
 Xt = strength.Xt; Xc = strength.Xc;
 Yt = strength.Yt; Yc = strength.Yc;
 S  = strength.S;   % NOTE: in-plane shear strength reused as transverse (S23) allowable
-                    % for the matrix-compression term -- standard simplification, flag in methods.
+                    % for the matrix-compression term - standard simplification, flag in methods.
 
-% Sharpness parameters (tune / continue these like beta)
+% Sharpness parameters 
 k_gate = 50;   % sigmoid sharpness for tension/compression gating within a mode
 k_ks   = 20;   % KS aggregation sharpness for combining fibre & matrix modes
 
@@ -29,7 +29,7 @@ dKE0th = cell(numele,1); ndof = size(edofMat,2);
 gp   = [-1 1]/sqrt(3);
 
 fadj_elem = cell(numele,1);
-q = 0.8; % stress interpolation exponent (unchanged from TsaiWu)
+q = 0.8; % stress interpolation exponent 
 
 % Element loop
 for e = 1:numele
@@ -127,7 +127,7 @@ for e = 1:numele
                     w_m * dImatrix_ds2;
                     w_f * dIfiber_dt12 + w_m * dImatrix_dt12 ];
 
-            %% ---- sensitivities (same chain-rule pattern as TsaiWu) ----
+            %% sensitivities
             % Density
             dsig_dx = q * xdens^(q-1) * sig_unscaled;
             dHdx_gp = psi' * dsig_dx;
@@ -153,13 +153,13 @@ for e = 1:numele
     dKE0th{e}    = dKE_dth;
 end
 
-% p-norm aggregation over elements (unchanged pattern from TsaiWu)
+% p-norm aggregation over elements 
 p = 8; % 8 16 32
 Hp  = (sum(HashinIdx.^p))^(1/p);
 g_h = Hp - 1;
 fac = (HashinIdx.^(p-1)) / (Hp^(p-1));
 
-HashinIdx_gp = HashinIdx; % kept for output-signature compatibility with TsaiWu's TW_gp slot
+HashinIdx_gp = HashinIdx; 
 
 % assemble adjoint RHS
 fadj = zeros(size(U));
@@ -169,7 +169,9 @@ end
 
 % adjoint solve
 lambda = zeros(size(U));
-lambda(freedofs) = K(freedofs,freedofs) \ fadj(freedofs);
+% lambda(freedofs) = K(freedofs,freedofs) \ fadj(freedofs); % (OLD)
+lambda(freedofs) = dK \ fadj(freedofs); % (NEW)
+
 
 % final sensitivities
 dgh_dx = zeros(numele,1);

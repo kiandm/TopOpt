@@ -2,11 +2,12 @@
 % By Zahur Ullah 21/5/2025 and edited to add Hashin stress-constraint by Kian Das 18/8/2026
 % Here it is optimising both density and theta for a fibre-reinforced composite in 2D
 % With Heaviside
+tic
 clear; clc; 
 close all;
 warning off
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin = 3; maxiter = 1000; theta_init = pi/2;
+volfrac = 0.4; penal = 3.0; rmin = 3; maxiter = 500; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -89,11 +90,11 @@ while change > 1e-3 && iter < maxiter
     [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
     xphy(1:numele) = x_proj;
     % FE Analysis
-    [U, K, KE0] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+    [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
     % Tsai-Wu constraint
     %[g_tw, dgtw_dx_raw, dgtw_dtheta, TW, ~, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     % Hashin constraint
-    [g_hs, dgh_dx_raw, dgh_dtheta, TW, ~, vonMises] = Hashin(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+    [g_hs, dgh_dx_raw, dgh_dtheta, TW, ~, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     % Objective function and sensitivities
     [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);   
     % Volume constraint and sensitivities
@@ -237,3 +238,5 @@ ax = gca;
 ax.YAxis(2).Color = 'r';
 title('Convergence History');
 grid on;
+
+toc
