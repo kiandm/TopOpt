@@ -28,6 +28,11 @@ Hs = sum(H,2);
 U = zeros(2*numnode,1);
 gs=gauss_domain(coords,numele,conn,2);
 gs1=gauss_domain(coords,numele,conn,1);    %1 gauss point at the centre
+% Pre-computing shape function derivatives (ONLY VALID FOR STRUCTURED MESH)
+dphix_ref = zeros(4,4); dphiy_ref = zeros(4,4); % (node, gauss-point)
+for gp_idx = 1:4
+    [~, dphix_ref(:,gp_idx), dphiy_ref(:,gp_idx)] = SF_FE(gs(:,gp_idx), coords, conn);
+end
 % Calculate the volume of each element
 ve=zeros(numele,1);
 gcount=0;
@@ -90,13 +95,13 @@ while change > 1e-3 && iter < maxiter
     [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
     xphy(1:numele) = x_proj;
     % FE Analysis
-    [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop);
+    [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
     % Tsai-Wu constraint
     %[g_tw, dgtw_dx_raw, dgtw_dtheta, TW, ~, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     % Hashin constraint
-    [g_hs, dgh_dx_raw, dgh_dtheta, TW, ~, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
+    [g_hs, dgh_dx_raw, dgh_dtheta, TW, ~, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref); % ADDED DPHI
     % Objective function and sensitivities
-    [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop);   
+    [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop, dphix_ref, dphiy_ref); % ADDED DPHI 
     % Volume constraint and sensitivities
     [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve); 
 %%

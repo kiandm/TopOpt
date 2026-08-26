@@ -1,4 +1,4 @@
-function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop)
+function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref) % ADDED DPHI
     % Update design variables
     x = xphy(1:numele);
     theta = xphy(numele+1:end);
@@ -45,9 +45,13 @@ function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat
         
         KE=zeros(8,8); 
         for ii=1:4
-            gcount=gcount+1; gg=gs(:,gcount); 
-            weight=gg(6); jac=gg(7);  
-            [phi, dphix, dphiy]=SF_FE(gg,coords,conn);
+            % gcount=gcount+1; gg=gs(:,gcount); 
+            % weight=gg(6); jac=gg(7);  
+            % [phi, dphix, dphiy]=SF_FE(gg,coords,conn);
+            gcount=gcount+1; gg=gs(:,gcount);
+            weight=gg(6); jac=gg(7);
+            dphix = dphix_ref(:,ii)'; dphiy = dphiy_ref(:,ii)';
+            
             Bmat=zeros(3,8);
             Bmat(1,1:2:end)=dphix;  Bmat(2,2:2:end)=dphiy;
             Bmat(3,1:2:end)=dphiy;  Bmat(3,2:2:end)=dphix;

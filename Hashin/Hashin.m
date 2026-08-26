@@ -1,5 +1,5 @@
 function [g_h, dgh_dx, dgh_dtheta, HashinIdx, HashinIdx_gp, vonMises] = Hashin( ...
-    U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs)
+    U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref)
 % Classical (non-mode-separated) Hashin stress constraint with adjoint sensitivities
 % Fibre and matrix modes combined per Gauss point via KS smooth-max;
 % tension/compression within each mode gated via sigmoid (differentiable Macaulay).
@@ -26,7 +26,7 @@ C0 = [ E1/(1-nu12*nu21), nu21*E1/(1-nu12*nu21),   0;
 HashinIdx = zeros(numele,1); dHdx    = zeros(numele,1);
 dHdth     = zeros(numele,1); vonMises = zeros(numele,1);
 dKE0th = cell(numele,1); ndof = size(edofMat,2);
-gp   = [-1 1]/sqrt(3);
+%gp   = [-1 1]/sqrt(3);
 
 fadj_elem = cell(numele,1);
 q = 0.8; % stress interpolation exponent 
@@ -34,7 +34,7 @@ q = 0.8; % stress interpolation exponent
 % Element loop
 for e = 1:numele
 
-    xe = coords(1,conn(:,e))'; ye = coords(2,conn(:,e))';
+    %xe = coords(1,conn(:,e))'; ye = coords(2,conn(:,e))';
     Ue = U(edofMat(e,:)); xdens = xphy(e); theta = xphy(numele + e);
     c = cos(theta); s = sin(theta);
     T_eps = [ c^2, s^2,  c*s;
@@ -48,17 +48,20 @@ for e = 1:numele
         for j = 1:2
 
             gcount = gcount + 1;
-            xi = gp(i); eta = gp(j);
+            %xi = gp(i); eta = gp(j);
             wt  = gs(6,gcount);
             jac = gs(7,gcount);
 
-            % Shape derivatives
-            dNdxi = 0.25 * ...
-                [-(1-eta),  (1-eta),  (1+eta), -(1+eta);
-                 -(1-xi),  -(1+xi),   (1+xi),   (1-xi)];
-            J = [dNdxi(1,:)*xe, dNdxi(1,:)*ye;
-                 dNdxi(2,:)*xe, dNdxi(2,:)*ye];
-            dNdx = J \ dNdxi;
+            % % Shape derivatives
+            % dNdxi = 0.25 * ...
+            %     [-(1-eta),  (1-eta),  (1+eta), -(1+eta);
+            %      -(1-xi),  -(1+xi),   (1+xi),   (1-xi)];
+            % J = [dNdxi(1,:)*xe, dNdxi(1,:)*ye;
+            %      dNdxi(2,:)*xe, dNdxi(2,:)*ye];
+            % dNdx = J \ dNdxi;
+            gp_idx = gcount - (e-1)*4; % local Gauss point index within this element (1..4)
+            dNdx = [dphix_ref(:,gp_idx)'; dphiy_ref(:,gp_idx)'];
+
 
             % B-matrix
             B = zeros(3,ndof);

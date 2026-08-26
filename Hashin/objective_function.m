@@ -1,4 +1,4 @@
-function [comp, dc_dx, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop)
+function [comp, dc_dx, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop, dphix_ref, dphiy_ref)
     
     % Update design variables
     x = xphy(1:numele);
@@ -45,9 +45,12 @@ function [comp, dc_dx, dc_theta] = objective_function(U, xphy, penal, numele, gs
         dKE_dtheta = zeros(8, 8); % Initialize element stiffness matrix
 
         for ii=1:4
-            gcount=gcount+1; gg=gs(:,gcount); 
-            weight=gg(6); jac=gg(7);  
-            [phi, dphix, dphiy]=SF_FE(gg,coords,conn);
+            % gcount=gcount+1; gg=gs(:,gcount); 
+            % weight=gg(6); jac=gg(7);  
+            % [phi, dphix, dphiy]=SF_FE(gg,coords,conn);
+            gcount=gcount+1; gg=gs(:,gcount);
+            weight=gg(6); jac=gg(7);
+            dphix = dphix_ref(:,ii)'; dphiy = dphiy_ref(:,ii)';
             Bmat=zeros(3,8);
             Bmat(1,1:2:end)=dphix;  Bmat(2,2:2:end)=dphiy;
             Bmat(3,1:2:end)=dphiy;  Bmat(3,2:2:end)=dphix;
