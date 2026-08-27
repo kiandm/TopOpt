@@ -7,7 +7,7 @@ clear; clc;
 close all;
 warning off
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin = 3; maxiter = 500; theta_init = pi/2;
+volfrac = 0.4; penal = 3.0; rmin_phys = 3; maxiter = 500; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -23,7 +23,7 @@ strength.Yc=118;
 strength.S=72; 
 %%
 % [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin);
-[coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin);
+[coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin_phys);
 Hs = sum(H,2);
 U = zeros(2*numnode,1);
 gs=gauss_domain(coords,numele,conn,2);

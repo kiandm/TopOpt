@@ -1,8 +1,9 @@
 function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= ...
-    problem_setup_Lbrac60(rmin)                     
-                           
+    problem_setup_Lbrac60(rmin_phys)                     
+% rmin_phys: filter radius in physical length units (same as coords)                           
 ndiv=100;  %150, 100, 50, 30 use multiple of 5                           
 size_cell=100/ndiv;
+rmin = rmin_phys / size_cell; % cells spanning the physical radius at this mesh density
 
 [x2d1, y2d1]=meshgrid(0:size_cell:40,   100:-size_cell:0); 
 [x2d2, y2d2]=meshgrid(40+size_cell:size_cell:100, 40:-size_cell:0); 
@@ -80,15 +81,20 @@ nodes_trac=find(coords(2,:)==40 & coords(1,:)>95);
 % nodes_trac=find(coords(1,:)==100 & coords(2,:)>=30); 
 coords_trac=coords(:,nodes_trac); 
 
-pres=-50; % -50 for ndiv=100, -100 for ndiv=50, -42.857 for ndiv=150
+P_total = -200; % Total applied load in physical units
+% pres=-50; % -50 for ndiv=100, -100 for ndiv=50, -42.857 for ndiv=150
 F=zeros(2*numnode,1); 
 
 %Traction boundary (point load)
-area=abs(coords(1,nodes_trac(2))-coords(1,nodes_trac(1))); 
+%area=abs(coords(1,nodes_trac(2))-coords(1,nodes_trac(1))); 
+L_trac = coords_trac(1,end) - coords_trac(1,1); % actual physical length spanned by the traction nodes
+pres = P_total / L_trac; % distributed load per unit length, auto-adjusts with mesh
 for el=1:length(nodes_trac)-1
-    F(2*nodes_trac(el))  =F(2*nodes_trac(el))  +pres*area/2;
-    F(2*nodes_trac(el+1))=F(2*nodes_trac(el+1))+pres*area/2;
-
+    %F(2*nodes_trac(el))  =F(2*nodes_trac(el))  +pres*area/2;
+    %F(2*nodes_trac(el+1))=F(2*nodes_trac(el+1))+pres*area/2;
+    area_el = abs(coords(1,nodes_trac(el+1)) - coords(1,nodes_trac(el))); % this segment's actual length
+    F(2*nodes_trac(el))  =F(2*nodes_trac(el))  +pres*area_el/2;
+    F(2*nodes_trac(el+1))=F(2*nodes_trac(el+1))+pres*area_el/2;
 end
 
 
