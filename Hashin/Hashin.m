@@ -11,9 +11,13 @@ Yt = strength.Yt; Yc = strength.Yc;
 S  = strength.S;   % NOTE: in-plane shear strength reused as transverse (S23) allowable
                     % for the matrix-compression term - standard simplification, flag in methods.
 
-% Sharpness parameters 
-k_gate = 50;   % sigmoid sharpness for tension/compression gating within a mode
-k_ks   = 20;   % KS aggregation sharpness for combining fibre & matrix modes
+% % Sharpness parameters 
+% k_gate = 50;   % sigmoid sharpness for tension/compression gating within a mode
+% k_ks   = 20;   % KS aggregation sharpness for combining fibre & matrix modes
+% Smoothing parameters (Dong et al. 2025, Eqs. 12 & 16)
+delta_f = 0.05*min(Xt,Xc);  % Heaviside transition half-width, fibre mode (tune)
+delta_m = 0.05*min(Yt,Yc);  % Heaviside transition half-width, matrix mode (tune)
+eps_max = 1e-3;             % smooth-max regularization (tune)
 
 % Material stiffness (material coordinates)
 E1   = matprop.E1; E2   = matprop.E2; nu12 = matprop.nu12;
@@ -92,44 +96,72 @@ for e = 1:numele
             vonMises(e) = vonMises(e) + vm_gp / 4;
 
             %% ---- Hashin failure index at this Gauss point ----
-            % Sub-mode indices
-            I_ft = (s1/Xt)^2 + (t12/S)^2;   % fibre tension
-            I_fc = (s1/Xc)^2;               % fibre compression
-            I_mt = (s2/Yt)^2 + (t12/S)^2;   % matrix tension
-            I_mc = (s2/(2*S))^2 + ((Yc/(2*S))^2 - 1)*(s2/Yc) + (t12/S)^2; % matrix compression
-
-            % Smooth tension/compression gates
-            g1 = 1/(1+exp(-k_gate*s1));     % ~1 in tension, ~0 in compression
-            g2 = 1/(1+exp(-k_gate*s2));
-
-            I_fiber  = g1*I_ft + (1-g1)*I_fc;
-            I_matrix = g2*I_mt + (1-g2)*I_mc;
-
-            % KS smooth-max combine (numerically stable form)
-            a_ks = k_ks*I_fiber; b_ks = k_ks*I_matrix;
-            m_ks = max(a_ks, b_ks);
-            H_gp = (m_ks + log(exp(a_ks-m_ks) + exp(b_ks-m_ks))) / k_ks;
-            w_f  = exp(a_ks-m_ks) / (exp(a_ks-m_ks) + exp(b_ks-m_ks)); % softmax weight, fibre
-            w_m  = 1 - w_f;                                            % softmax weight, matrix
-
+            % % Sub-mode indices
+            % I_ft = (s1/Xt)^2 + (t12/S)^2;   % fibre tension
+            % I_fc = (s1/Xc)^2;               % fibre compression
+            % I_mt = (s2/Yt)^2 + (t12/S)^2;   % matrix tension
+            % I_mc = (s2/(2*S))^2 + ((Yc/(2*S))^2 - 1)*(s2/Yc) + (t12/S)^2; % matrix compression
+            % 
+            % % Smooth tension/compression gates
+            % g1 = 1/(1+exp(-k_gate*s1));     % ~1 in tension, ~0 in compression
+            % g2 = 1/(1+exp(-k_gate*s2));
+            % 
+            % I_fiber  = g1*I_ft + (1-g1)*I_fc;
+            % I_matrix = g2*I_mt + (1-g2)*I_mc;
+            % 
+            % % KS smooth-max combine (numerically stable form)
+            % a_ks = k_ks*I_fiber; b_ks = k_ks*I_matrix;
+            % m_ks = max(a_ks, b_ks);
+            % H_gp = (m_ks + log(exp(a_ks-m_ks) + exp(b_ks-m_ks))) / k_ks;
+            % w_f  = exp(a_ks-m_ks) / (exp(a_ks-m_ks) + exp(b_ks-m_ks)); % softmax weight, fibre
+            % w_m  = 1 - w_f;                                            % softmax weight, matrix
+            % 
+            % H_e = H_e + H_gp * wt * jac;
+            % 
+            % %% ---- derivatives of H_gp w.r.t. (s1, s2, t12) ----
+            % dIft_ds1 = 2*s1/Xt^2;   dIft_dt12 = 2*t12/S^2;
+            % dIfc_ds1 = 2*s1/Xc^2;   dIfc_dt12 = 0;
+            % dImt_ds2 = 2*s2/Yt^2;   dImt_dt12 = 2*t12/S^2;
+            % dImc_ds2 = s2/(2*S^2) + ((Yc/(2*S))^2 - 1)/Yc; dImc_dt12 = 2*t12/S^2;
+            % 
+            % dIfiber_ds1  = k_gate*g1*(1-g1)*(I_ft - I_fc) + g1*dIft_ds1 + (1-g1)*dIfc_ds1;
+            % dIfiber_dt12 = g1*dIft_dt12 + (1-g1)*dIfc_dt12;
+            % 
+            % dImatrix_ds2  = k_gate*g2*(1-g2)*(I_mt - I_mc) + g2*dImt_ds2 + (1-g2)*dImc_ds2;
+            % dImatrix_dt12 = g2*dImt_dt12 + (1-g2)*dImc_dt12;
+            % 
+            % psi = [ w_f * dIfiber_ds1;
+            %         w_m * dImatrix_ds2;
+            %         w_f * dIfiber_dt12 + w_m * dImatrix_dt12 ];
+            
+            %% ---- Hashin failure index at this Gauss point (Dong et al. 2025, Eqs. 12-16) ----
+            Hf = heavisideBlend(Xt, Xc, s1, delta_f);   % Eq. 12, blends the ALLOWABLE, not the index
+            Hm = heavisideBlend(Yt, Yc, s2, delta_m);
+            
+            FI_f = sqrt((s1/Hf)^2 + (t12/S)^2);         % Eq. 13
+            FI_m = sqrt((s2/Hm)^2 + (t12/S)^2);         % Eq. 14
+            
+            diff_fm = FI_f - FI_m;
+            root_fm = sqrt(diff_fm^2 + eps_max);
+            H_gp = 0.5*((FI_f+FI_m) + root_fm - sqrt(eps_max));   % Eq. 16 (corrected)
+            
             H_e = H_e + H_gp * wt * jac;
-
+            
             %% ---- derivatives of H_gp w.r.t. (s1, s2, t12) ----
-            dIft_ds1 = 2*s1/Xt^2;   dIft_dt12 = 2*t12/S^2;
-            dIfc_ds1 = 2*s1/Xc^2;   dIfc_dt12 = 0;
-            dImt_ds2 = 2*s2/Yt^2;   dImt_dt12 = 2*t12/S^2;
-            dImc_ds2 = s2/(2*S^2) + ((Yc/(2*S))^2 - 1)/Yc; dImc_dt12 = 2*t12/S^2;
-
-            dIfiber_ds1  = k_gate*g1*(1-g1)*(I_ft - I_fc) + g1*dIft_ds1 + (1-g1)*dIfc_ds1;
-            dIfiber_dt12 = g1*dIft_dt12 + (1-g1)*dIfc_dt12;
-
-            dImatrix_ds2  = k_gate*g2*(1-g2)*(I_mt - I_mc) + g2*dImt_ds2 + (1-g2)*dImc_ds2;
-            dImatrix_dt12 = g2*dImt_dt12 + (1-g2)*dImc_dt12;
-
-            psi = [ w_f * dIfiber_ds1;
-                    w_m * dImatrix_ds2;
-                    w_f * dIfiber_dt12 + w_m * dImatrix_dt12 ];
-
+            dHf_ds1 = dHeavisideBlend(Xt, Xc, s1, delta_f);
+            dHm_ds2 = dHeavisideBlend(Yt, Yc, s2, delta_m);
+            
+            dFIf_ds1  = (1/FI_f) * (s1/Hf) * (1/Hf - s1/Hf^2*dHf_ds1);   % Eq. 34
+            dFIf_dt12 = (1/FI_f) * (t12/S^2);
+            dFIm_ds2  = (1/FI_m) * (s2/Hm) * (1/Hm - s2/Hm^2*dHm_ds2);   % Eq. 35
+            dFIm_dt12 = (1/FI_m) * (t12/S^2);
+            
+            dmax_dFIf = 0.5 + 0.5*diff_fm/root_fm;    % Eq. 32
+            dmax_dFIm = 0.5 - 0.5*diff_fm/root_fm;    % Eq. 33
+            
+            psi = [ dmax_dFIf * dFIf_ds1;
+                    dmax_dFIm * dFIm_ds2;
+                    dmax_dFIf * dFIf_dt12 + dmax_dFIm * dFIm_dt12 ];
             %% sensitivities
             % Density
             dsig_dx = q * xdens^(q-1) * sig_unscaled;
@@ -188,5 +220,24 @@ for e = 1:numele
                - (penal/xdens) * (le' * Ke0 * Ue);
     dgh_dtheta(e) = fac(e) * dHdth(e) ...
                    - (le' * dKE0th{e} * Ue);
+end
+end
+function h = heavisideBlend(a, b, c, delta)
+% Eq. 12: smooth, compact-support cubic blend between allowable a (c>delta)
+% and b (c<-delta); C1-continuous at the band edges (verified symbolically).
+if c > delta
+    h = a;
+elseif c < -delta
+    h = b;
+else
+    h = 0.75*(a-b)*(c/delta - c^3/(3*delta^3)) + (a+b)/2;
+end
+end
+
+function dh = dHeavisideBlend(a, b, c, delta)
+if c > delta || c < -delta
+    dh = 0;
+else
+    dh = 0.75*(a-b)*(1/delta - c^2/delta^3);
 end
 end
