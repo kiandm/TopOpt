@@ -1,7 +1,7 @@
 function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= ...
     problem_setup_Lbrac60(rmin_phys)                     
 % rmin_phys: filter radius in physical length units (same as coords)                           
-ndiv=100;  %150, 100, 50, 30 use multiple of 5                           
+ndiv=50;  %150, 100, 50, 30 use multiple of 5                           
 size_cell=100/ndiv;
 rmin = rmin_phys / size_cell; % cells spanning the physical radius at this mesh density
 

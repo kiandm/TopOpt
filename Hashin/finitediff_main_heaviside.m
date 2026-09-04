@@ -8,7 +8,7 @@ close all;
 warning off
 % Run 25 iterations first to do central finite difference
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin_phys = 3; maxiter = 25; theta_init = pi/2;
+volfrac = 0.4; penal = 3.0; rmin_phys = 2; maxiter = 75; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -182,7 +182,15 @@ end
 warning on
 %%
 % Finite difference checks
-
+% Preallocate errors for plotting
+rel_err_gx  = nan(numele,1);   % dg_hs/dx
+rel_err_gth = nan(numele,1);   % dg_hs/dtheta
+rel_err_cx  = nan(numele,1);   % dc/dx
+rel_err_cth = nan(numele,1);   % dc/dtheta
+abs_err_gx  = nan(numele,1);
+abs_err_gth = nan(numele,1);
+abs_err_cx  = nan(numele,1);
+abs_err_cth = nan(numele,1);
 % Get filtered physical variables
 x_tilde_fd = (H * xval(1:numele)) ./ Hs;
 [x_proj_fd,dxphy_fd] = heavisideProjection(x_tilde_fd, beta, eta);
@@ -206,15 +214,33 @@ dc_dx_fd   = H * (dc_dx_chain_fd   ./ Hs);  % Filter
 %dv_dx_fd   = H * (dv_dx_chain_fd   ./ Hs);  % Filter
 dgh_dx_fd = H * (dgh_dx_chain_fd ./ Hs);  % Filter
 
-filename = ['finitediffoutput_1e-6.txt'];
+% sensitivities in theta (circular filter, same treatment as the main loop)
+p1_tilde_fd = (H * cos(xval(numele+1:end))) ./ Hs;
+p2_tilde_fd = (H * sin(xval(numele+1:end))) ./ Hs;
+R2_fd = max(p1_tilde_fd.^2 + p2_tilde_fd.^2, 1e-6);
+dtheta_dp1_fd = -p2_tilde_fd ./ R2_fd;
+dtheta_dp2_fd =  p1_tilde_fd ./ R2_fd;
+
+dc_dp1_fd = dc_theta_fd .* dtheta_dp1_fd;
+dc_dp2_fd = dc_theta_fd .* dtheta_dp2_fd;
+dc_dth_fd = -sin(xval(numele+1:end)) .* (H * (dc_dp1_fd ./ Hs)) ...
+           + cos(xval(numele+1:end)) .* (H * (dc_dp2_fd ./ Hs));
+
+dgh_dp1_fd = dgh_dtheta_fd .* dtheta_dp1_fd;
+dgh_dp2_fd = dgh_dtheta_fd .* dtheta_dp2_fd;
+dgh_dth_fd = -sin(xval(numele+1:end)) .* (H * (dgh_dp1_fd ./ Hs)) ...
+            + cos(xval(numele+1:end)) .* (H * (dgh_dp2_fd ./ Hs));
+
+filename = ['finitediffoutput_1e-4.txt'];
 fileID = fopen(filename, 'w');
-h_fd = 1e-6;
+h_fd = 1e-4;
+check_elems = unique([1, numele, round(linspace(1, numele, 1600))]);
 
 % Element loops to calculate perturbed values
 % 1. dg_hs/dx
-fprintf(fileID, '%s', '\n--- dgtw/dx: Hashin sensitivity w.r.t. density ---\n');
-fprintf(fileID, '%s' ,'Element', 'Analytic value', 'Numeric value', 'Abs. err', 'Rel. err\n');
-for e = 1:numele
+fprintf(fileID, '\n%s\n', '--- dgtw/dx: Hashin sensitivity w.r.t. density ---');
+fprintf(fileID, '%s\n' ,'Element AnalyticValue Numericvalue Abs.Err Rel.Err');
+for e = check_elems % 1:numele
    xval_pos = xval; xval_neg = xval;
    xval_pos(e) = xval(e) + h_fd;
    xval_neg(e) = xval(e) - h_fd;
@@ -228,11 +254,14 @@ for e = 1:numele
    dgh_dx_analytic = dgh_dx_fd(e);
    abs_err = abs(dgh_dx_fd_num - dgh_dx_analytic);
    rel_err = abs_err / (abs(dgh_dx_analytic) + 1e-14);
+   abs_err_gx(e)  = abs_err;
+   rel_err_gx(e) = rel_err;
    fprintf(fileID, '%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dgh_dx_analytic, dgh_dx_fd_num, abs_err, rel_err);
 end
 % 2. dg_hs/dtheta
-fprintf(fileID, '%s', '\n--- dgh/dtheta: Hashin sensitivity w.r.t. fibre angle ---\n');
-for e = 1:numele
+fprintf(fileID, '\n%s\n', '--- dgh/dtheta: Hashin sensitivity w.r.t. fibre angle ---');
+fprintf(fileID, '%s\n' ,'Element AnalyticValue Numericvalue Abs.Err Rel.Err');
+for e = check_elems % 1:numele
    xval_pos = xval; xval_neg = xval;
    xval_pos(numele + e) = xval(numele + e) + h_fd;
    xval_neg(numele + e) = xval(numele + e) - h_fd;
@@ -243,14 +272,17 @@ for e = 1:numele
    [g_pos, ~, ~, ~, ~, ~] = Hashin(U_pos, dK_pos, KE0_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);
    [g_neg, ~, ~, ~, ~, ~] = Hashin(U_neg, dK_neg, KE0_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);   
    dgh_dth_fd_num = (g_pos - g_neg) / (2 * h_fd);
-   dgh_dth_analytic = dgtw_dx_filt_fd(e);
+   dgh_dth_analytic = dgh_dth_fd(e);
    abs_err = abs(dgh_dth_fd_num - dgh_dth_analytic);
    rel_err = abs_err / (abs(dgh_dth_analytic) + 1e-14);
+   abs_err_gth(e) = abs_err;
+   rel_err_gth(e) = rel_err;
    fprintf(fileID, '%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dgh_dth_analytic, dgh_dth_fd_num, abs_err, rel_err);
 end
 % 3. dc/dx
-fprintf(fileID, '%s', '\n--- dc/dx: Compliance sensitivity w.r.t. density ---\n');
-for e = 1:numele
+fprintf(fileID, '\n%s\n', '--- dc/dx: Compliance sensitivity w.r.t. density ---');
+fprintf(fileID, '%s\n' ,'Element AnalyticValue Numericvalue Abs.Err Rel.Err');
+for e = check_elems % 1:numele
    xval_pos = xval; xval_neg = xval;
    xval_pos(e) = xval(e) + h_fd;
    xval_neg(e) = xval(e) - h_fd;
@@ -264,11 +296,14 @@ for e = 1:numele
    dc_dx_analytic = dc_dx_fd(e);
    abs_err = abs(dc_dx_fd_num - dc_dx_analytic);
    rel_err = abs_err / (abs(dc_dx_analytic) + 1e-14);
+   abs_err_cx(e)  = abs_err;
+   rel_err_cx(e) = rel_err;
    fprintf(fileID,'%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dc_dx_analytic, dc_dx_fd_num, abs_err, rel_err);
 end
 % 4. dc/dtheta
-fprintf(fileID,'%s','\n--- dc/dtheta: Compliance sensitivity w.r.t. fibre angle ---\n');
-for e = 1:numele
+fprintf(fileID,'\n%s\n','--- dc/dtheta: Compliance sensitivity w.r.t. fibre angle ---');
+fprintf(fileID, '%s\n' ,'Element AnalyticValue Numericvalue Abs.Err Rel.Err');
+for e = check_elems % 1:numele
    xval_pos = xval; xval_neg = xval;
    xval_pos(numele + e) = xval(numele + e) + h_fd;
    xval_neg(numele + e) = xval(numele + e) - h_fd;
@@ -282,71 +317,183 @@ for e = 1:numele
    dc_dth_analytic = dc_dth_fd(e);
    abs_err = abs(dc_dth_fd_num - dc_dth_analytic);
    rel_err = abs_err / (abs(dc_dth_analytic) + 1e-14);
+   abs_err_cth(e) = abs_err;
+   rel_err_cth(e) = rel_err;
    fprintf(fileID, '%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dc_dth_analytic, dc_dth_fd_num, abs_err, rel_err);
 end
 %%
-% Measure of non-discreteness
-x = xphy(1:numele);
-M = 100 * sum(4 * x .* (1 - x))/numele;
-disp(M) % percentage of average greyness (i.e. design is M2% grey )
-% Plot orientation
-theta_rad = xphy(numele+1:end);
-theta_deg = mod(rad2deg(theta_rad), 180); % Extract physical angles and convert from radians to degrees [0, 180]
-x_dens = xphy(1:numele);
-theta_plot = theta_deg;
-theta_plot(x_dens <= 0.5) = NaN; % Hide void elements
-figure(2); clf;
-patch('Faces', conn', ...
-      'Vertices', coords', ...
-      'FaceVertexCData', theta_plot, ...
-      'FaceColor', 'flat', ...
-      'EdgeColor', 'none');% Plot elements colored by fiber angle
-axis equal tight off;
-colormap(hsv);             % 'hsv' or 'jet' work well for periodic angles
-c = colorbar;
-c.Label.String = 'Fiber Angle (degrees)';
-clim([0 180]);             % Fixed scale from 0° to 180°
-set(gcf, 'Color', 'w');
-title('Fiber Orientation Field'); % Format colormap, limits, and colorbar
-hold on;
-barLength = 1;              % Set appropriate length relative to element size
-halfL = barLength / 2;
-ind = find(x_dens > 0.5);   % Solid elements index
-x_lines = [x_cen(ind) - halfL*cos(theta_rad(ind)), ...
-           x_cen(ind) + halfL*cos(theta_rad(ind)), ...
-           nan(length(ind),1)]';
-y_lines = [y_cen(ind) - halfL*sin(theta_rad(ind)), ... % Fixed: y_cen instead of x_cen
-           y_cen(ind) + halfL*sin(theta_rad(ind)), ...
-           nan(length(ind),1)]';
-line(x_lines(:), y_lines(:), 'Color', [0 0 0 0.5], 'LineWidth', 0.8); % Overlay fiber direction vector lines
-% Hashin failure plot
-figure(3); clf;
-mask = xphy(1:numele) < 0.3;
-field_plot2 = TW;
-field_plot2(mask) = NaN;
-patch('Faces', conn', ...
-      'Vertices', coords', ...
-      'FaceVertexCData', field_plot2, ...
-      'FaceColor', 'flat', ...
-      'EdgeColor', 'none');
-set(gcf, 'Color', 'white')
-axis equal off;
-colorbar;
-clim([0 1.2]);   % 1 = failure limit
-title(sprintf('Hashin Index (iteration %d)', iter));
-drawnow;
-% plot iteration convergence history
-figure(4); clf;
-yyaxis left
-plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
-xlabel('Iteration');
-ylabel('Objective Function (Compliance)');
-yyaxis right
-plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'Color', 'r');
-ylabel('Hashin Index, g_{hs}');
-ax = gca;
-ax.YAxis(2).Color = 'r';
-title('Convergence History');
-grid on;
+%% Plot FD validation relative errors spatially on the mesh
+% Run this after the FD-check section, once rel_err_gx, rel_err_gth,
+% rel_err_cx, rel_err_cth have been populated (see fd_error_storage_snippet.m).
+
+outlier_thresh = 0.05;   % flag any element with rel_err above this
+edge_col = [0.5 0.5 0.5]; % mesh outline color, shared by base and overlay
+
+fields = {rel_err_gx, rel_err_gth, rel_err_cx, rel_err_cth};
+titles = {'dg_{hs}/dx  rel. err', 'dg_{hs}/d\theta  rel. err', ...
+          'dc/dx  rel. err', 'dc/d\theta  rel. err'};
+
+figure(10); clf;
+for k = 1:4
+    subplot(2,2,k);
+    err_k = fields{k};
+    valid = ~isnan(err_k);
+
+    % --- Base layer: full mesh, every element, light gray, edges on ---
+    patch('Faces', conn', 'Vertices', coords', ...
+          'FaceColor', [0.92 0.92 0.92], 'EdgeColor', edge_col, ...
+          'LineWidth', 0.3);
+    axis equal tight off;
+    hold on;
+
+    % --- Overlay: only elements that were actually FD-checked ---
+    if any(valid)
+        logerr = log10(err_k(valid) + 1e-12);
+        patch('Faces', conn(:,valid)', 'Vertices', coords', ...
+              'FaceVertexCData', logerr, ...
+              'FaceColor', 'flat', 'EdgeColor', edge_col, ...
+              'LineWidth', 0.3);
+    end
+
+    colormap(gca, parula);
+    cb = colorbar;
+    cb.Label.String = 'log_{10}(rel. err)';
+    clim([-5 1]);   % adjust range to taste based on your data spread
+
+    % outliers = find(err_k > outlier_thresh);
+    % if ~isempty(outliers)
+    %     plot(x_cen(outliers), y_cen(outliers), 'ro', ...
+    %          'MarkerSize', 6, 'LineWidth', 1.2);
+    % end
+
+    title(titles{k});
+    set(gcf, 'Color', 'white');
+end
+% sgtitle(sprintf('FD validation: elements with rel. err > %.2f circled in red (gray = not checked)', outlier_thresh)); 
+% sgtitle(sprintf('FD validation: elements with rel. err > %.2f circled in red', outlier_thresh)); 
+sgtitle('FD validation: rel. err')
+%% Plot FD validation absolute errors spatially on the mesh
+% Run this after the FD-check section, once abs_err_gx, abs_err_gth,
+% abs_err_cx, abs_err_cth have been populated (see storage snippet).
+%
+% NOTE: unlike relative error, absolute error is NOT dimensionless -- the
+% four sensitivities live on very different scales (Hashin ~1e-3, compliance
+% ~1e0-1e1), so color limits and the outlier threshold are computed
+% per-panel from that panel's own data, rather than shared across all four.
+
+outlier_pct = 95;         % flag elements above this percentile of abs. err (per field)
+edge_col = [0.5 0.5 0.5]; % mesh outline color, shared by base and overlay
+
+fields = {abs_err_gx, abs_err_gth, abs_err_cx, abs_err_cth};
+titles = {'dg_{hs}/dx  abs. err', 'dg_{hs}/d\theta  abs. err', ...
+          'dc/dx  abs. err', 'dc/d\theta  abs. err'};
+
+figure(11); clf;
+for k = 1:4
+    subplot(2,2,k);
+    err_k = fields{k};
+    valid = ~isnan(err_k);
+
+    % --- Base layer: full mesh, every element, light gray, edges on ---
+    patch('Faces', conn', 'Vertices', coords', ...
+          'FaceColor', [0.92 0.92 0.92], 'EdgeColor', edge_col, ...
+          'LineWidth', 0.3);
+    axis equal tight off;
+    hold on;
+
+    % --- Overlay: only elements that were actually FD-checked ---
+    if any(valid)
+        logerr = log10(err_k(valid) + 1e-12);
+        patch('Faces', conn(:,valid)', 'Vertices', coords', ...
+              'FaceVertexCData', logerr, ...
+              'FaceColor', 'flat', 'EdgeColor', edge_col, ...
+              'LineWidth', 0.3);
+
+        % per-panel color range, since scales differ across quantities
+        clim([min(logerr) max(logerr)]);
+    end
+
+    colormap(gca, parula);
+    cb = colorbar;
+    cb.Label.String = 'log_{10}(abs. err)';
+
+    % per-panel outlier threshold (percentile of this field's own errors)
+    % if any(valid)
+    %     thresh_k = prctile(err_k(valid), outlier_pct);
+    %     outliers = find(err_k > thresh_k);
+    %     if ~isempty(outliers)
+    %         plot(x_cen(outliers), y_cen(outliers), 'ro', ...
+    %              'MarkerSize', 6, 'LineWidth', 1.2);
+    %     end
+    % end
+
+    title(titles{k});
+    set(gcf, 'Color', 'white');
+end
+% sgtitle(sprintf('FD validation: elements above %dth percentile abs. err circled in red (per panel)', outlier_pct));
+sgtitle('FD validation: abs. err')
+% % Measure of non-discreteness
+% x = xphy(1:numele);
+% M = 100 * sum(4 * x .* (1 - x))/numele;
+% disp(M) % percentage of average greyness (i.e. design is M2% grey )
+% % Plot orientation
+% theta_rad = xphy(numele+1:end);
+% theta_deg = mod(rad2deg(theta_rad), 180); % Extract physical angles and convert from radians to degrees [0, 180]
+% x_dens = xphy(1:numele);
+% theta_plot = theta_deg;
+% theta_plot(x_dens <= 0.5) = NaN; % Hide void elements
+% figure(2); clf;
+% patch('Faces', conn', ...
+%       'Vertices', coords', ...
+%       'FaceVertexCData', theta_plot, ...
+%       'FaceColor', 'flat', ...
+%       'EdgeColor', 'none');% Plot elements colored by fiber angle
+% axis equal tight off;
+% colormap(hsv);             % 'hsv' or 'jet' work well for periodic angles
+% c = colorbar;
+% c.Label.String = 'Fiber Angle (degrees)';
+% clim([0 180]);             % Fixed scale from 0° to 180°
+% set(gcf, 'Color', 'w');
+% title('Fiber Orientation Field'); % Format colormap, limits, and colorbar
+% hold on;
+% barLength = 1;              % Set appropriate length relative to element size
+% halfL = barLength / 2;
+% ind = find(x_dens > 0.5);   % Solid elements index
+% x_lines = [x_cen(ind) - halfL*cos(theta_rad(ind)), ...
+%            x_cen(ind) + halfL*cos(theta_rad(ind)), ...
+%            nan(length(ind),1)]';
+% y_lines = [y_cen(ind) - halfL*sin(theta_rad(ind)), ... % Fixed: y_cen instead of x_cen
+%            y_cen(ind) + halfL*sin(theta_rad(ind)), ...
+%            nan(length(ind),1)]';
+% line(x_lines(:), y_lines(:), 'Color', [0 0 0 0.5], 'LineWidth', 0.8); % Overlay fiber direction vector lines
+% % Hashin failure plot
+% figure(3); clf;
+% mask = xphy(1:numele) < 0.3;
+% field_plot2 = TW;
+% field_plot2(mask) = NaN;
+% patch('Faces', conn', ...
+%       'Vertices', coords', ...
+%       'FaceVertexCData', field_plot2, ...
+%       'FaceColor', 'flat', ...
+%       'EdgeColor', 'none');
+% set(gcf, 'Color', 'white')
+% axis equal off;
+% colorbar;
+% clim([0 1.2]);   % 1 = failure limit
+% title(sprintf('Hashin Index (iteration %d)', iter));
+% drawnow;
+% % plot iteration convergence history
+% figure(4); clf;
+% yyaxis left
+% plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
+% xlabel('Iteration');
+% ylabel('Objective Function (Compliance)');
+% yyaxis right
+% plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'Color', 'r');
+% ylabel('Hashin Index, g_{hs}');
+% ax = gca;
+% ax.YAxis(2).Color = 'r';
+% title('Convergence History');
+% grid on;
 
 toc
