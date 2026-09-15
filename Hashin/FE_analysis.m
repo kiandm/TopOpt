@@ -22,7 +22,7 @@ function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat
     % Initialize global stiffness matrix and force vector
     % K = sparse(ndof, ndof); % (OLD)
     % F = sparse(ndof, 1);
-    KE0 = cell(numele,1);
+    % KE0 = cell(numele,1);
     KE_all = zeros(8,8,numele); % (NEW)
 
     gcount=0; 
@@ -57,10 +57,11 @@ function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat
             Bmat(3,1:2:end)=dphiy;  Bmat(3,2:2:end)=dphix;
             KE=KE+jac*weight*Bmat'*Cxy*Bmat;
         end 
-        KE0{ee}=KE;
+        % KE0{ee}=KE;
         % K(edofMat(ee,:),edofMat(ee,:))=K(edofMat(ee,:),edofMat(ee,:))+KE; 
         KE_all(:,:,ee) = KE; % (NEW)
     end 
+    KE0 = KE_all;
     % Vectorised sparse assembly (NEW)
     iK = reshape(kron(edofMat, ones(8,1))',64*numele,1);
     jK = reshape(kron(edofMat, ones(1,8))',64*numele,1);

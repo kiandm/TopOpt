@@ -29,10 +29,13 @@ C0 = [ E1/(1-nu12*nu21), nu21*E1/(1-nu12*nu21),   0;
 % Initialisation
 HashinIdx = zeros(numele,1); dHdx    = zeros(numele,1);
 dHdth     = zeros(numele,1); vonMises = zeros(numele,1);
-dKE0th = cell(numele,1); ndof = size(edofMat,2);
-%gp   = [-1 1]/sqrt(3);
+% dKE0th = cell(numele,1); ndof = size(edofMat,2);
+ndof = size(edofMat,2);
+dKE0th = zeros(ndof,ndof,numele);
+% gp   = [-1 1]/sqrt(3);
 
-fadj_elem = cell(numele,1);
+% fadj_elem = cell(numele,1);
+fadj_elem = zeros(numele,ndof);
 q = 0.8; % stress interpolation exponent 
 
 % Element loop
@@ -44,10 +47,16 @@ for e = 1:numele
     T_eps = [ c^2, s^2,  c*s;
               s^2, c^2, -c*s;
              -2*c*s, 2*c*s, c^2-s^2 ];
+    Tinv = [c^2,  s^2, -2*c*s;
+            s^2,  c^2,  2*c*s;
+            c*s, -c*s,  c^2-s^2];
+    dTinv_dth = [-sin(2*theta),  sin(2*theta), -2*cos(2*theta);
+                  sin(2*theta), -sin(2*theta),  2*cos(2*theta);
+                  cos(2*theta), -cos(2*theta), -2*sin(2*theta)];
+    dCxy_dth = dTinv_dth * C0 * Tinv' + Tinv * C0 * dTinv_dth';    
     H_e   = 0.0; dHdx_e = 0.0;
     fadj_e = zeros(ndof,1); dH_dth_e = 0.0;
     dKE_dth   = zeros(8,8); gcount = (e-1)*4;
-
     for i = 1:2
         for j = 1:2
 
@@ -69,20 +78,23 @@ for e = 1:numele
 
             % B-matrix
             B = zeros(3,ndof);
-            for a = 1:4
-                B(:,2*a-1:2*a) = ...
-                    [dNdx(1,a), 0;
-                     0, dNdx(2,a);
-                     dNdx(2,a), dNdx(1,a)];
-            end
+            % for a = 1:4
+            %     B(:,2*a-1:2*a) = ...
+            %         [dNdx(1,a), 0;
+            %          0, dNdx(2,a);
+            %          dNdx(2,a), dNdx(1,a)];
+            % end
+            B(1,1:2:end) = dNdx(1,:);  B(2,2:2:end) = dNdx(2,:);
+            B(3,1:2:end) = dNdx(2,:);  B(3,2:2:end) = dNdx(1,:);
 
-            Tinv = [c^2,  s^2, -2*c*s;
-                    s^2,  c^2,  2*c*s;
-                    c*s, -c*s,  c^2-s^2];
-            dTinv_dth = [-sin(2*theta),  sin(2*theta), -2*cos(2*theta);
-                          sin(2*theta), -sin(2*theta),  2*cos(2*theta);
-                          cos(2*theta), -cos(2*theta), -2*sin(2*theta)];
-            dCxy_dth = dTinv_dth * C0 * Tinv' + Tinv * C0 * dTinv_dth';
+
+            % Tinv = [c^2,  s^2, -2*c*s;
+            %         s^2,  c^2,  2*c*s;
+            %         c*s, -c*s,  c^2-s^2];
+            % dTinv_dth = [-sin(2*theta),  sin(2*theta), -2*cos(2*theta);
+            %               sin(2*theta), -sin(2*theta),  2*cos(2*theta);
+            %               cos(2*theta), -cos(2*theta), -2*sin(2*theta)];
+            % dCxy_dth = dTinv_dth * C0 * Tinv' + Tinv * C0 * dTinv_dth';
             dKE_dth = dKE_dth + (xdens^penal) * jac * wt * B' * dCxy_dth * B;
 
             % Strain/stress (material axes)
@@ -172,6 +184,9 @@ for e = 1:numele
             dT_eps_dth = [-sin(2*theta),  sin(2*theta),   cos(2*theta);
                            sin(2*theta), -sin(2*theta),  -cos(2*theta);
                           -2*cos(2*theta), 2*cos(2*theta), -2*sin(2*theta)];
+            % dTinv_dth = [-sin(2*theta),  sin(2*theta), -2*cos(2*theta);
+            %               sin(2*theta), -sin(2*theta),  2*cos(2*theta);
+            %               cos(2*theta), -cos(2*theta), -2*sin(2*theta)];
             dH_dth_gp = psi' * (xdens^q * C0 * dT_eps_dth * (B * Ue));
             dH_dth_e  = dH_dth_e + dH_dth_gp * wt * jac;
 
@@ -184,8 +199,10 @@ for e = 1:numele
     HashinIdx(e) = H_e;
     dHdx(e)      = dHdx_e;
     dHdth(e)     = dH_dth_e;
-    fadj_elem{e} = fadj_e;
-    dKE0th{e}    = dKE_dth;
+    % fadj_elem{e} = fadj_e;
+    fadj_elem(e,:) = fadj_e';
+    % dKE0th{e}    = dKE_dth;
+    dKE0th(:,:,e)  = dKE_dth;
 end
 
 % p-norm aggregation over elements 
@@ -197,10 +214,12 @@ fac = (HashinIdx.^(p-1)) / (Hp^(p-1));
 HashinIdx_gp = HashinIdx; 
 
 % assemble adjoint RHS
-fadj = zeros(size(U));
-for e = 1:numele
-    fadj(edofMat(e,:)) = fadj(edofMat(e,:)) + fac(e) * fadj_elem{e};
-end
+% fadj = zeros(size(U));
+% for e = 1:numele
+%     fadj(edofMat(e,:)) = fadj(edofMat(e,:)) + fac(e) * fadj_elem{e};
+% end
+fadj = accumarray(edofMat(:), reshape(fac .* fadj_elem, [], 1), [size(U,1) 1]);
+
 
 % adjoint solve
 lambda = zeros(size(U));
@@ -209,18 +228,30 @@ lambda(freedofs) = dK \ fadj(freedofs); % (NEW)
 
 
 % final sensitivities
-dgh_dx = zeros(numele,1);
-dgh_dtheta = zeros(numele,1);
-for e = 1:numele
-    xdens = xphy(e);
-    Ue = U(edofMat(e,:));
-    le = lambda(edofMat(e,:));
-    Ke0 = KE0{e};
-    dgh_dx(e) = fac(e)*dHdx(e) ...
-               - (penal/xdens) * (le' * Ke0 * Ue);
-    dgh_dtheta(e) = fac(e) * dHdth(e) ...
-                   - (le' * dKE0th{e} * Ue);
-end
+% dgh_dx = zeros(numele,1);
+% dgh_dtheta = zeros(numele,1);
+% for e = 1:numele
+%     xdens = xphy(e);
+%     Ue = U(edofMat(e,:));
+%     le = lambda(edofMat(e,:));
+%     Ke0 = KE0{e};
+%     dgh_dx(e) = fac(e)*dHdx(e) ...
+%                - (penal/xdens) * (le' * Ke0 * Ue);
+%     dgh_dtheta(e) = fac(e) * dHdth(e) ...
+%                    - (le' * dKE0th{e} * Ue);
+% end
+Uall = U(edofMat)';       % ndof x numele
+Lall = lambda(edofMat)';  % ndof x numele
+
+KU  = reshape(pagemtimes(KE0,    reshape(Uall,ndof,1,numele)), ndof, numele);
+dKU = reshape(pagemtimes(dKE0th, reshape(Uall,ndof,1,numele)), ndof, numele);
+
+quadK  = sum(Lall .* KU,  1)';   % le' * Ke0    * Ue, one value per element
+quaddK = sum(Lall .* dKU, 1)';   % le' * dKE0th * Ue, one value per element
+
+xdens_all = xphy(1:numele);
+dgh_dx     = fac .* dHdx  - (penal ./ xdens_all) .* quadK;
+dgh_dtheta = fac .* dHdth - quaddK;
 end
 function h = heavisideBlend(a, b, c, delta)
 % Eq. 12: smooth, compact-support cubic blend between allowable a (c>delta)

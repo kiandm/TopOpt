@@ -73,8 +73,11 @@ xphy=xval;                          % Filter design variable
 % Precompute element centroids
 x_cen=zeros(numele,1); y_cen=x_cen; 
 for i=1:numele
-    x_cen(i)=mean(coords(1, conn(:,i)));
-    y_cen(i)=mean(coords(2, conn(:,i)));
+    % x_cen(i)=mean(coords(1, conn(:,i)));
+    % y_cen(i)=mean(coords(2, conn(:,i)));
+    xrow = coords(1,:); yrow = coords(2,:);
+    x_cen = mean(xrow(conn), 1)';
+    y_cen = mean(yrow(conn), 1)';
 end 
 barLength = 1;              % TOTAL bar length for fibre angle plotting
 halfL = barLength / 2;      % plot from middle of element

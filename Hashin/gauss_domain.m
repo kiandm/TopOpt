@@ -11,11 +11,13 @@ elseif nQ==2
     gauss(2,2) = 1;
 end
 
+gs = zeros(7, numcell*nQ*nQ);
 count=1; 
 for e=1:numcell
-    for i=1:4
-        je=conn(i,e); xe(i)=coords(1,je); ye(i)=coords(2,je);
-    end
+    % for i=1:4
+    %     je=conn(i,e); xe(i)=coords(1,je); ye(i)=coords(2,je);
+    % end
+    xe = coords(1,conn(:,e)); ye = coords(2,conn(:,e));
     one=ones(1,4);
     psiJ=[-1 +1 +1 -1]; etaJ=[-1 -1  +1  +1];
     for i=1:nQ %4 gauss points
