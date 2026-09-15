@@ -53,7 +53,10 @@ for e = 1:numele
     dTinv_dth = [-sin(2*theta),  sin(2*theta), -2*cos(2*theta);
                   sin(2*theta), -sin(2*theta),  2*cos(2*theta);
                   cos(2*theta), -cos(2*theta), -2*sin(2*theta)];
-    dCxy_dth = dTinv_dth * C0 * Tinv' + Tinv * C0 * dTinv_dth';    
+    dCxy_dth = dTinv_dth * C0 * Tinv' + Tinv * C0 * dTinv_dth'; 
+    dT_eps_dth = [-sin(2*theta),  sin(2*theta),   cos(2*theta);
+                           sin(2*theta), -sin(2*theta),  -cos(2*theta);
+                          -2*cos(2*theta), 2*cos(2*theta), -2*sin(2*theta)];
     H_e   = 0.0; dHdx_e = 0.0;
     fadj_e = zeros(ndof,1); dH_dth_e = 0.0;
     dKE_dth   = zeros(8,8); gcount = (e-1)*4;
@@ -181,9 +184,9 @@ for e = 1:numele
             dHdx_e  = dHdx_e + dHdx_gp * wt * jac;
 
             % Theta
-            dT_eps_dth = [-sin(2*theta),  sin(2*theta),   cos(2*theta);
-                           sin(2*theta), -sin(2*theta),  -cos(2*theta);
-                          -2*cos(2*theta), 2*cos(2*theta), -2*sin(2*theta)];
+            % dT_eps_dth = [-sin(2*theta),  sin(2*theta),   cos(2*theta);
+            %                sin(2*theta), -sin(2*theta),  -cos(2*theta);
+            %               -2*cos(2*theta), 2*cos(2*theta), -2*sin(2*theta)];
             % dTinv_dth = [-sin(2*theta),  sin(2*theta), -2*cos(2*theta);
             %               sin(2*theta), -sin(2*theta),  2*cos(2*theta);
             %               cos(2*theta), -cos(2*theta), -2*sin(2*theta)];

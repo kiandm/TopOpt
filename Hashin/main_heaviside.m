@@ -7,7 +7,7 @@ clear; clc;
 close all;
 warning off
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin_phys = 3; maxiter = 500; theta_init = pi/2;
+volfrac = 0.4; penal = 3.0; rmin_phys = 3; maxiter = 1000; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction

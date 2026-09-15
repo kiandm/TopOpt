@@ -116,9 +116,11 @@ for cc=1:numele
     difx=abs((gpos(1,1)-xi(1,:))); 
     dify=abs((gpos(2,1)-xi(2,:))); 
     dif=sqrt(difx.^2 + dify.^2); 
-    rij=dif./sqrt(dm_cells(1,v).^2 + dm_cells(2,v).^2);
-    wij=(rmin-rij)./rmin; 
-    W(cc,v)=wij; 
+    % rij=dif./sqrt(dm_cells(1,v).^2 + dm_cells(2,v).^2);
+    % wij=(rmin-rij)./rmin; 
+    % W(cc,v)=wij; 
+    wij = max(rmin_phys - dif, 0) / rmin_phys;
+    W(cc,v)=wij;
 end
 W=W./sum(W,2); 
 W=sparse(W); 
