@@ -56,7 +56,7 @@ xmax_theta =  (pi) * ones(numele,1); % Upper bound for fiber directions
 %%
 % INITIALIZE MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
-m     = 2;                          % The number of general constraints.
+m     = 5;                          % The number of general constraints.
 n     = numel(xval);                % The number of design variables x_j.
 xmin  = [xmin_x; xmin_theta];       % Column vector with the lower bounds for the variables x_j.
 xmax  = [xmax_x; xmax_theta];       % Column vector with the upper bounds for the variables x_j.
@@ -87,7 +87,7 @@ xphy(1:numele) = x_proj;
 p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
 xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
 %% Optimisation loop
-iterationHistory = zeros(maxiter, 5);
+iterationHistory = zeros(maxiter, 8);
 change = 1; iter = 0;
 while change > 1e-3 && iter < maxiter
     iter = iter + 1;
@@ -100,8 +100,7 @@ while change > 1e-3 && iter < maxiter
     % Tsai-Wu constraint
     %[g_tw, dgtw_dx_raw, dgtw_dtheta, TW, ~, vonMises] = TsaiWu(U, K, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs);
     % Hashin constraint
-    [g_hs, dgh_dx_raw, dgh_dtheta, TW, ~, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref); % ADDED DPHI
-    % Objective function and sensitivities
+    [g_hs, dgh_dx_raw, dgh_dtheta, FailIdx, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);    % Objective function and sensitivities
     [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop, dphix_ref, dphiy_ref); % ADDED DPHI 
     % Volume constraint and sensitivities
     [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve); 
@@ -132,8 +131,8 @@ while change > 1e-3 && iter < maxiter
     dgh_dx = H * (dgh_dx_chain ./ Hs);  % Filter
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Combined objective function sensitivities
-    dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
-            dgh_dx(:).',     dgh_dtheta(:).' ];  % Combined constraint sensitivities 
+     dfdx = [ dv_dx(:).',   dv_theta(:).'  ;
+                dgh_dx.',    dgh_dtheta.' ];  % Combined constraint sensitivities 
  %%
     % Initial values for MMA
     f0val = c;             % Initial objective function value
@@ -152,8 +151,9 @@ while change > 1e-3 && iter < maxiter
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
     change = max(change_x, change_t);
-    fprintf('It %d: Obj = %f, V = %f, g_hs = %f, Change = %f, Change in x = %f, Change in theta = %f\n', iter, c, v, g_hs, change, change_x, change_t);
-    iterationHistory(iter, :) = [iter, c, v, change, g_hs];
+    fprintf('It %d: Obj = %f, V = %f, g_ft = %f, g_fc = %f, g_mt = %f, g_mc = %f, Change = %f, Change in x = %f, Change in theta = %f\n', ...
+             iter, c, v, g_hs(1), g_hs(2), g_hs(3), g_hs(4), change, change_x, change_t);
+    iterationHistory(iter, :) = [iter, c, v, change, g_hs(1), g_hs(2), g_hs(3), g_hs(4)];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 0
         figure(1); clf;
@@ -170,7 +170,7 @@ while change > 1e-3 && iter < maxiter
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_hs));
+        title(sprintf('Iter: %d | Obj: %.2f | max(g): %.2f', iter, c, max(g_hs)));        
         drawnow;
     end
     % Beta continuation block
@@ -183,12 +183,12 @@ warning on
 %%
 % Finite difference checks
 % Preallocate errors for plotting
-rel_err_gx  = nan(numele,1);   % dg_hs/dx
-rel_err_gth = nan(numele,1);   % dg_hs/dtheta
+rel_err_gx  = nan(numele,4);   % dg/dx,     columns = [ft fc mt mc]
+rel_err_gth = nan(numele,4);   % dg/dtheta, columns = [ft fc mt mc]
 rel_err_cx  = nan(numele,1);   % dc/dx
 rel_err_cth = nan(numele,1);   % dc/dtheta
-abs_err_gx  = nan(numele,1);
-abs_err_gth = nan(numele,1);
+abs_err_gx  = nan(numele,4);
+abs_err_gth = nan(numele,4);
 abs_err_cx  = nan(numele,1);
 abs_err_cth = nan(numele,1);
 % Get filtered physical variables
@@ -204,8 +204,7 @@ xphy_fd(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
 % Baseline quantities
 [U_fd, K_fd, KE0_fd, dK_fd] = FE_analysis(xphy_fd, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
 [c_fd, dc_dx_raw_fd, dc_theta_fd] = objective_function(U_fd, xphy_fd, penal, numele, gs, edofMat, coords, conn, matprop, dphix_ref, dphiy_ref); % ADDED DPHI 
-[g_hs_fd, dgh_dx_raw_fd, dgh_dtheta_fd, TW_fd, ~, vonMises_fd] = Hashin(U_fd, dK_fd, KE0_fd, xphy_fd, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref); % ADDED DPHI
-
+[g_hs_fd, dgh_dx_raw_fd, dgh_dtheta_fd, FailIdx_fd, vonMises_fd] = Hashin(U_fd, dK_fd, KE0_fd, xphy_fd, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);
 % Need filtered sensitivites
 dc_dx_chain_fd   = dc_dx_raw_fd   .* dxphy_fd; % Chain rule
 %dv_dx_chain_fd   = dv_dx_raw_fd   .* dxphy_fd; % Chain rule
@@ -248,15 +247,18 @@ for e = check_elems % 1:numele
    xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
    [U_pos, K_pos, KE0_pos, dK_pos] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref);
    [U_neg, K_neg, KE0_neg, dK_neg] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref);
-   [g_pos, ~, ~, ~, ~, ~] = Hashin(U_pos, dK_pos, KE0_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);
-   [g_neg, ~, ~, ~, ~, ~] = Hashin(U_neg, dK_neg, KE0_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);   
-   dgh_dx_fd_num = (g_pos - g_neg) / (2 * h_fd);
-   dgh_dx_analytic = dgh_dx_fd(e);
+   [g_pos, ~, ~, ~, ~] = Hashin(U_pos, dK_pos, KE0_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);
+   [g_neg, ~, ~, ~, ~] = Hashin(U_neg, dK_neg, KE0_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);
+   dgh_dx_fd_num = (g_pos - g_neg) / (2 * h_fd);      % 4x1, one value per mode
+   dgh_dx_analytic = dgh_dx_fd(e,:)';                 % 4x1
    abs_err = abs(dgh_dx_fd_num - dgh_dx_analytic);
-   rel_err = abs_err / (abs(dgh_dx_analytic) + 1e-14);
-   abs_err_gx(e)  = abs_err;
-   rel_err_gx(e) = rel_err;
-   fprintf(fileID, '%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dgh_dx_analytic, dgh_dx_fd_num, abs_err, rel_err);
+   rel_err = abs_err ./ (abs(dgh_dx_analytic) + 1e-14);
+   abs_err_gx(e,:) = abs_err';
+   rel_err_gx(e,:) = rel_err';
+   modeNames = {'ft','fc','mt','mc'};
+   for m_idx = 1:4
+       fprintf(fileID, '%-8d %-4s %-14.6e %-14.6e %-14.6e %-10.2e\n', e, modeNames{m_idx}, dgh_dx_analytic(m_idx), dgh_dx_fd_num(m_idx), abs_err(m_idx), rel_err(m_idx));
+   end
 end
 % 2. dg_hs/dtheta
 fprintf(fileID, '\n%s\n', '--- dgh/dtheta: Hashin sensitivity w.r.t. fibre angle ---');
@@ -269,15 +271,18 @@ for e = check_elems % 1:numele
    xphy_neg =  apply_filter_and_projection(xval_neg, numele, H, Hs, beta, eta);
    [U_pos, K_pos, KE0_pos, dK_pos] = FE_analysis(xphy_pos, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref);
    [U_neg, K_neg, KE0_neg, dK_neg] = FE_analysis(xphy_neg, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref);
-   [g_pos, ~, ~, ~, ~, ~] = Hashin(U_pos, dK_pos, KE0_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);
-   [g_neg, ~, ~, ~, ~, ~] = Hashin(U_neg, dK_neg, KE0_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);   
+   [g_pos, ~, ~, ~, ~] = Hashin(U_pos, dK_pos, KE0_pos, xphy_pos, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);
+   [g_neg, ~, ~, ~, ~] = Hashin(U_neg, dK_neg, KE0_neg, xphy_neg, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);
    dgh_dth_fd_num = (g_pos - g_neg) / (2 * h_fd);
-   dgh_dth_analytic = dgh_dth_fd(e);
+   dgh_dth_analytic = dgh_dth_fd(e,:)';                 % 4x1
    abs_err = abs(dgh_dth_fd_num - dgh_dth_analytic);
    rel_err = abs_err / (abs(dgh_dth_analytic) + 1e-14);
-   abs_err_gth(e) = abs_err;
-   rel_err_gth(e) = rel_err;
-   fprintf(fileID, '%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dgh_dth_analytic, dgh_dth_fd_num, abs_err, rel_err);
+   abs_err_gth(e,:) = abs_err';
+   rel_err_gth(e,:) = rel_err';
+   modeNames = {'ft','fc','mt','mc'};
+   for m_idx = 1:4
+       fprintf(fileID, '%-8d %-4s %-14.6e %-14.6e %-14.6e %-10.2e\n', e, modeNames{m_idx}, dgh_dx_analytic(m_idx), dgh_dx_fd_num(m_idx), abs_err(m_idx), rel_err(m_idx));
+   end
 end
 % 3. dc/dx
 fprintf(fileID, '\n%s\n', '--- dc/dx: Compliance sensitivity w.r.t. density ---');
@@ -329,8 +334,8 @@ end
 outlier_thresh = 0.05;   % flag any element with rel_err above this
 edge_col = [0.5 0.5 0.5]; % mesh outline color, shared by base and overlay
 
-fields = {rel_err_gx, rel_err_gth, rel_err_cx, rel_err_cth};
-titles = {'dg_{hs}/dx  rel. err', 'dg_{hs}/d\theta  rel. err', ...
+fields = {max(rel_err_gx,[],2), max(rel_err_gth,[],2), rel_err_cx, rel_err_cth};
+titles = {'dg/dx  max rel. err (any mode)', 'dg/d\theta  max rel. err (any mode)', ...
           'dc/dx  rel. err', 'dc/d\theta  rel. err'};
 
 figure(10); clf;
@@ -384,8 +389,8 @@ sgtitle('FD validation: rel. err')
 outlier_pct = 95;         % flag elements above this percentile of abs. err (per field)
 edge_col = [0.5 0.5 0.5]; % mesh outline color, shared by base and overlay
 
-fields = {abs_err_gx, abs_err_gth, abs_err_cx, abs_err_cth};
-titles = {'dg_{hs}/dx  abs. err', 'dg_{hs}/d\theta  abs. err', ...
+fields = {max(abs_err_gx,[],2), max(abs_err_gth,[],2), abs_err_cx, abs_err_cth};
+titles = {'dg/dx  max abs. err (any mode)', 'dg/d\theta  max abs. err (any mode)', ...
           'dc/dx  abs. err', 'dc/d\theta  abs. err'};
 
 figure(11); clf;
