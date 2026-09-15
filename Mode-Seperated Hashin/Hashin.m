@@ -1,8 +1,11 @@
-function [g_h, dgh_dx, dgh_dtheta, HashinIdx, HashinIdx_gp, vonMises] = Hashin( ...
+function [g_h, dgh_dx, dgh_dtheta, FailIdx, HashinIdx_gp, vonMises] = Hashin( ...
     U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref)
 % Classical (non-mode-separated) Hashin stress constraint with adjoint sensitivities
-% Fibre and matrix modes combined per Gauss point via cubic Heaviside;
-% Mode separation (keeping fibre/matrix as distinct constraints) is a later extension.
+% Each of the four classical Hashin sub-modes - fibre tension (ft), fibre
+% compression (fc), matrix tension (mt), matrix compression (mc) - is
+% aggregated independently over the mesh via a p-norm, giving four
+% separate constraints g = [g_ft; g_fc; g_mt; g_mc] for the optimiser
+% instead of one combined index.
 
 % Strength allowables
 Xt = strength.Xt; Xc = strength.Xc;
