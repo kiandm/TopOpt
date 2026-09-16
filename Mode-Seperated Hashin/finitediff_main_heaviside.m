@@ -8,7 +8,7 @@ close all;
 warning off
 % Run 25 iterations first to do central finite difference
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin_phys = 2; maxiter = 75; theta_init = pi/2;
+volfrac = 0.4; penal = 3.0; rmin_phys = 5; maxiter = 75; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -262,7 +262,7 @@ for e = check_elems % 1:numele
 end
 % 2. dg_hs/dtheta
 fprintf(fileID, '\n%s\n', '--- dgh/dtheta: Hashin sensitivity w.r.t. fibre angle ---');
-fprintf(fileID, '%s\n' ,'Element AnalyticValue Numericvalue Abs.Err Rel.Err');
+fprintf(fileID, '%s\n' ,'Element ModeName AnalyticValue Numericvalue Abs.Err Rel.Err');
 for e = check_elems % 1:numele
    xval_pos = xval; xval_neg = xval;
    xval_pos(numele + e) = xval(numele + e) + h_fd;
@@ -276,13 +276,12 @@ for e = check_elems % 1:numele
    dgh_dth_fd_num = (g_pos - g_neg) / (2 * h_fd);
    dgh_dth_analytic = dgh_dth_fd(e,:)';                 % 4x1
    abs_err = abs(dgh_dth_fd_num - dgh_dth_analytic);
-   rel_err = abs_err / (abs(dgh_dth_analytic) + 1e-14);
+   rel_err = abs_err ./ (abs(dgh_dth_analytic) + 1e-14);
    abs_err_gth(e,:) = abs_err';
    rel_err_gth(e,:) = rel_err';
    modeNames = {'ft','fc','mt','mc'};
    for m_idx = 1:4
-       fprintf(fileID, '%-8d %-4s %-14.6e %-14.6e %-14.6e %-10.2e\n', e, modeNames{m_idx}, dgh_dx_analytic(m_idx), dgh_dx_fd_num(m_idx), abs_err(m_idx), rel_err(m_idx));
-   end
+   fprintf(fileID, '%-8d %-4s %-14.6e %-14.6e %-14.6e %-10.2e\n', e, modeNames{m_idx}, dgh_dth_analytic(m_idx), dgh_dth_fd_num(m_idx), abs_err(m_idx), rel_err(m_idx));   end
 end
 % 3. dc/dx
 fprintf(fileID, '\n%s\n', '--- dc/dx: Compliance sensitivity w.r.t. density ---');

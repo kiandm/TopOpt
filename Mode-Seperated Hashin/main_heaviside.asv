@@ -7,8 +7,8 @@ clear; clc;
 close all;
 warning off
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin_phys = 5; 
-maxiter = 500; theta_init = pi/2;
+volfrac = 0.25; penal = 3.0; rmin_phys = 5; 
+maxiter = 1000; theta_init = 0; %pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -23,7 +23,8 @@ strength.Yt=31;                                  % Transverse direction tension 
 strength.Yc=118;                                 % Transverse direction compression (MPa)
 strength.S=72;                                   % Shear term (MPa)
 %%
-[coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin_phys);
+% [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin_phys);
+[coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin_phys);
 Hs = sum(H,2);
 U = zeros(2*numnode,1);
 gs=gauss_domain(coords,numele,conn,2);
@@ -86,9 +87,10 @@ xphy(1:numele) = x_proj;
 p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
 xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
 %% Optimisation loop
-iterationHistory = zeros(maxiter, 5);
-change = 1; iter = 0;
-while change > 1e-3 && iter < maxiter
+iterationHistory = zeros(maxiter, 8);
+converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+change = 1; iter = 0; M = 100;
+while ~converged && iter < maxiter    
     iter = iter + 1;
     % Heaviside projection
     x_tilde = (H*xval(1:numele))./Hs;
@@ -97,8 +99,8 @@ while change > 1e-3 && iter < maxiter
     % FE Analysis
     [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
     % Hashin constraint
-    [g_hs, dgh_dx_raw, dgh_dtheta, TW, ~, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref); % ADDED DPHI
-    % Objective function and sensitivities
+    [g_hs, dgh_dx_raw, dgh_dtheta, FailIdx, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);    % Objective function and sensitivities
+    % Objectvie function
     [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop, dphix_ref, dphiy_ref); % ADDED DPHI 
     % Volume constraint and sensitivities
     [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve); 
@@ -129,8 +131,8 @@ while change > 1e-3 && iter < maxiter
     dgh_dx = H * (dgh_dx_chain ./ Hs);             % Filter
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Combined objective function sensitivities
-    dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
-            dgh_dx(:).',     dgh_dtheta(:).' ];    % Combined constraint sensitivities 
+    dfdx = [ dv_dx(:).',   dv_theta(:).'  ;
+               dgh_dx.',     dgh_dtheta.'   ];    % Combined constraint sensitivities 
  %%
     % Initial values for MMA
     f0val = c;             % Initial objective function value
@@ -148,8 +150,9 @@ while change > 1e-3 && iter < maxiter
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
     change = max(change_x, change_t);
-    fprintf('It %d: Obj = %f, V = %f, g_hs = %f, Change = %f, Change in x = %f, Change in theta = %f\n', iter, c, v, g_hs, change, change_x, change_t);
-    iterationHistory(iter, :) = [iter, c, v, change, g_hs];
+    fprintf('It %d: Obj = %f, V = %f, M = %f, g_ft = %f, g_fc = %f, g_mt = %f, g_mc = %f, Change = %f, Change in x = %f, Change in theta = %f\n', ...
+        iter, c, v, M, g_hs(1), g_hs(2), g_hs(3), g_hs(4), change, change_x, change_t);
+    iterationHistory(iter, :) = [iter, c, v, change, g_hs(1), g_hs(2), g_hs(3), g_hs(4)];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 0
         figure(1); clf;
@@ -166,7 +169,7 @@ while change > 1e-3 && iter < maxiter
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        title(sprintf('Iter: %d | Obj: %.2f | Stress: %.2f', iter, c, g_hs));
+        title(sprintf('Iter: %d | Obj: %.2f | max(g): %.2f', iter, c, max(g_hs)));
         drawnow;
     end
     % Beta continuation block
@@ -174,6 +177,8 @@ while change > 1e-3 && iter < maxiter
         beta = min(beta*2, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
+    M = 100 * sum(4*xphy(1:numele).*(1-xphy(1:numele))) / numele;
+    converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
 end
 warning on
 %%
@@ -213,19 +218,23 @@ y_lines = [y_cen(ind) - halfL*sin(theta_rad(ind)), ... % Fixed: y_cen instead of
 line(x_lines(:), y_lines(:), 'Color', [0 0 0 0.5], 'LineWidth', 0.8); % Overlay fiber direction vector lines
 % Hashin failure plot
 figure(3); clf;
+modeNames = {'Fibre Tension', 'Fibre Compression', 'Matrix Tension', 'Matrix Compression'};
 mask = xphy(1:numele) < 0.3;
-field_plot2 = TW;
-field_plot2(mask) = NaN;
-patch('Faces', conn', ...
-      'Vertices', coords', ...
-      'FaceVertexCData', field_plot2, ...
-      'FaceColor', 'flat', ...
-      'EdgeColor', 'none');
-set(gcf, 'Color', 'white')
-axis equal off;
-colorbar;
-clim([0 1.2]);   % 1 = failure limit
-title(sprintf('Hashin Index (iteration %d)', iter));
+for k = 1:4
+    subplot(2,2,k);
+    field_plot2 = FailIdx(:,k);
+    field_plot2(mask) = NaN;
+    patch('Faces', conn', ...
+          'Vertices', coords', ...
+          'FaceVertexCData', field_plot2, ...
+          'FaceColor', 'flat', ...
+          'EdgeColor', 'none');
+    axis equal off;
+    colorbar;
+    clim([0 1.2]);   % 1 = failure limit
+    title(sprintf('%s (iter %d)', modeNames{k}, iter));
+end
+set(gcf, 'Color', 'white');
 drawnow;
 % plot iteration convergence history
 figure(4); clf;
@@ -234,10 +243,12 @@ plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
 xlabel('Iteration');
 ylabel('Objective Function (Compliance)');
 yyaxis right
-plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'Color', 'r');
-ylabel('Hashin Index, g_{hs}');
-ax = gca;
-ax.YAxis(2).Color = 'r';
+plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'DisplayName', 'g_{ft}'); hold on;
+plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 6), '-s', 'DisplayName', 'g_{fc}');
+plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 7), '-^', 'DisplayName', 'g_{mt}');
+plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 8), '-d', 'DisplayName', 'g_{mc}');
+ylabel('Hashin mode constraints, g');
+legend('Location', 'best');
 title('Convergence History');
 grid on;
 toc

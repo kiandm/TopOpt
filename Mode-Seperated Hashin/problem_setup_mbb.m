@@ -1,5 +1,5 @@
 function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= problem_setup_mbb(rmin)
-nely=20;  nelx=60; 
+nely=40;  nelx=120; 
 Hb=nely;  Lb=nelx; 
 
 [x2d,y2d]=meshgrid(0:Lb/nelx:Lb, Hb:-Hb/nely:0);

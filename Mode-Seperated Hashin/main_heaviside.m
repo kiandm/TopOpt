@@ -7,8 +7,8 @@ clear; clc;
 close all;
 warning off
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin_phys = 5; 
-maxiter = 1000; theta_init = pi/2;
+volfrac = 0.25; penal = 3.0; rmin_phys = 5; 
+maxiter = 1000; theta_init = 0; %pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -23,7 +23,8 @@ strength.Yt=31;                                  % Transverse direction tension 
 strength.Yc=118;                                 % Transverse direction compression (MPa)
 strength.S=72;                                   % Shear term (MPa)
 %%
-[coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin_phys);
+% [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin_phys);
+[coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin_phys);
 Hs = sum(H,2);
 U = zeros(2*numnode,1);
 gs=gauss_domain(coords,numele,conn,2);
@@ -87,8 +88,9 @@ p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
 xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
 %% Optimisation loop
 iterationHistory = zeros(maxiter, 8);
-change = 1; iter = 0;
-while change > 1e-3 && iter < maxiter
+converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+change = 1; iter = 0; M = 100;
+while ~converged && iter < maxiter    
     iter = iter + 1;
     % Heaviside projection
     x_tilde = (H*xval(1:numele))./Hs;
@@ -148,8 +150,8 @@ while change > 1e-3 && iter < maxiter
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
     change = max(change_x, change_t);
-    fprintf('It %d: Obj = %f, V = %f, g_ft = %f, g_fc = %f, g_mt = %f, g_mc = %f, Change = %f, Change in x = %f, Change in theta = %f\n', ...
-        iter, c, v, g_hs(1), g_hs(2), g_hs(3), g_hs(4), change, change_x, change_t);
+    fprintf('It %d: Obj = %f, V = %f, M = %f, g_ft = %f, g_fc = %f, g_mt = %f, g_mc = %f, Change = %f, Change in x = %f, Change in theta = %f\n', ...
+        iter, c, v, M, g_hs(1), g_hs(2), g_hs(3), g_hs(4), change, change_x, change_t);
     iterationHistory(iter, :) = [iter, c, v, change, g_hs(1), g_hs(2), g_hs(3), g_hs(4)];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 0
@@ -175,6 +177,8 @@ while change > 1e-3 && iter < maxiter
         beta = min(beta*2, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
+    M = 100 * sum(4*xphy(1:numele).*(1-xphy(1:numele))) / numele;
+    converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
 end
 warning on
 %%
