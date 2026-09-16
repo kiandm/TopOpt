@@ -1,6 +1,9 @@
-function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= problem_setup_mbb(rmin)
-nely=40;  nelx=120; 
-Hb=nely;  Lb=nelx; 
+function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= problem_setup_mbb(rmin_phys)
+
+nely=80;  nelx=160; 
+Hb=40;  Lb=80; 
+size_cell = Lb/nelx;              % physical size of one element (currently 1, since Lb:=nelx)
+rmin = rmin_phys / size_cell;     % cell-count radius, used only for the candidate search below
 
 [x2d,y2d]=meshgrid(0:Lb/nelx:Lb, Hb:-Hb/nely:0);
 
@@ -62,7 +65,9 @@ yspac=Hb/nely;
 % nodes_trac=find(coords(2,:)==40); 
 % nodes_trac=nodes_trac(1:1);
 % coords_trac = coords(:,nodes_trac); 
-F = sparse(2,1,-1,2*(nely+1)*(nelx+1),1);
+%F = sparse(2,1,-1,2*(nely+1)*(nelx+1),1);
+P_total = -60;   % match the scale used in problem_setup_Lbrac60 so stresses actually approach the allowables
+F = sparse(2,1,P_total,2*(nely+1)*(nelx+1),1);
 %filter for density
 %coordinate of background cells centres
 gs=gauss_domain(coords,numele,conn,1); 
@@ -81,9 +86,9 @@ for cc=1:numele
     difx=abs((gpos(1,1)-xi(1,:))); 
     dify=abs((gpos(2,1)-xi(2,:))); 
     dif=sqrt(difx.^2 + dify.^2); 
-    rij=dif./sqrt(dm_cells(1,v).^2 + dm_cells(2,v).^2);
-    wij=(rmin-rij)./rmin; 
+    wij = max(rmin_phys - dif, 0) / rmin_phys;
     W(cc,v)=wij; 
+    %W(cc,v)=wij; 
 end
 W=W./sum(W,2); 
 W=sparse(W); 
