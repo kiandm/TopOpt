@@ -1,7 +1,7 @@
 function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= problem_setup_mbb(rmin_phys)
 
-nely=80;  nelx=160; 
-Hb=40;  Lb=80; 
+nely=50;  nelx=100; 
+Hb=50;  Lb=100; 
 size_cell = Lb/nelx;              % physical size of one element (currently 1, since Lb:=nelx)
 rmin = rmin_phys / size_cell;     % cell-count radius, used only for the candidate search below
 
@@ -66,8 +66,11 @@ yspac=Hb/nely;
 % nodes_trac=nodes_trac(1:1);
 % coords_trac = coords(:,nodes_trac); 
 %F = sparse(2,1,-1,2*(nely+1)*(nelx+1),1);
-P_total = -60;   % match the scale used in problem_setup_Lbrac60 so stresses actually approach the allowables
-F = sparse(2,1,P_total,2*(nely+1)*(nelx+1),1);
+P_total = -400;   % match the scale used in problem_setup_Lbrac60 so stresses actually approach the allowables
+% F = sparse(2,1,P_total,2*(nely+1)*(nelx+1),1);
+mid_y = Hb/2;
+node_load = find(coords(1,:)==Lb & coords(2,:)==mid_y);
+F = sparse(2*node_load, 1, -400, 2*numnode, 1);
 %filter for density
 %coordinate of background cells centres
 gs=gauss_domain(coords,numele,conn,1); 

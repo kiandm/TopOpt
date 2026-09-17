@@ -122,7 +122,7 @@ for cc=1:numele
     wij = max(rmin_phys - dif, 0) / rmin_phys;
     W(cc,v)=wij;
 end
-W=W./sum(W,2); 
+% W=W./sum(W,2);   % remove this line — return raw symmetric weights
 W=sparse(W); 
                         
 % figure
