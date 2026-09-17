@@ -24,7 +24,8 @@ strength.Yc=118;                                 % Transverse direction compress
 strength.S=72;                                   % Shear term (MPa)
 %%
 % [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin_phys);
-[coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin_phys);
+% [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin_phys);
+[coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_cantilever(rmin_phys);
 Hs = sum(H,2);
 U = zeros(2*numnode,1);
 gs=gauss_domain(coords,numele,conn,2);
@@ -51,8 +52,8 @@ xval = [x; theta];                           % Combine design variables
 % Bounds for densities and fiber directions
 xmin_x = 1e-4 * ones(numele,1);              % Lower bound for densities
 xmax_x = 1 * ones(numele,1);                 % Upper bound for densities
-xmin_theta = (0) * ones(numele,1);           % Lower bound for fiber directions
-xmax_theta =  (pi) * ones(numele,1);         % Upper bound for fiber directions
+xmin_theta = -(pi/2) * ones(numele,1);           % Lower bound for fiber directions
+xmax_theta =  (pi/2) * ones(numele,1);         % Upper bound for fiber directions
 %%
 % INITIALIZE MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
@@ -88,8 +89,8 @@ p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
 xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
 %% Optimisation loop
 iterationHistory = zeros(maxiter, 8);
-converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
 change = 1; iter = 0; M = 100;
+converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
 while ~converged && iter < maxiter    
     iter = iter + 1;
     % Heaviside projection
@@ -188,7 +189,8 @@ M = 100 * sum(4 * x .* (1 - x))/numele;
 disp(M) % percentage of average greyness (i.e. design is M2% grey )
 % Plot orientation
 theta_rad = xphy(numele+1:end);
-theta_deg = mod(rad2deg(theta_rad), 180); % Extract physical angles and convert from radians to degrees [0, 180]
+%theta_deg = mod(rad2deg(theta_rad), 180); % Extract physical angles and convert from radians to degrees [0, 180]
+theta_deg = mod(rad2deg(theta_rad)+90, 180)-90; % Extract physical angles and convert from radians to degrees [0, 180]
 x_dens = xphy(1:numele);
 theta_plot = theta_deg;
 theta_plot(x_dens <= 0.5) = NaN; % Hide void elements
@@ -202,7 +204,8 @@ axis equal tight off;
 colormap(hsv);             % 'hsv' or 'jet' work well for periodic angles
 c = colorbar;
 c.Label.String = 'Fiber Angle (degrees)';
-clim([0 180]);             % Fixed scale from 0° to 180°
+% clim([0 180]);             % Fixed scale from 0° to 180°
+clim([-90 90]);             % Fixed scale from 0° to 180°
 set(gcf, 'Color', 'w');
 title('Fiber Orientation Field'); % Format colormap, limits, and colorbar
 hold on;
