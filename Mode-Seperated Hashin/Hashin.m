@@ -92,11 +92,14 @@ for e = 1:numele
             g1 = 1/(1+exp(-k_gate*s1));   % ~1 in fibre tension, ~0 in fibre compression
             g2 = 1/(1+exp(-k_gate*s2));   % ~1 in matrix tension, ~0 in matrix compression
 
-            I_ft = (s1/Xt)^2 + (t12/S)^2;                                    % fibre tension
-            I_fc = (s1/Xc)^2;                                                % fibre compression
-            I_mt = (s2/Yt)^2 + (t12/S)^2;                                    % matrix tension
-            I_mc = (s2/(2*S))^2 + ((Yc/(2*S))^2 - 1)*(s2/Yc) + (t12/S)^2;    % matrix compression
+            I_ft = (s1/Xt)^2 + (t12/S)^2;                                     % fibre tension
+            %I_fc = (s1/Xc)^2;                                                % fibre compression
+            I_fc = (s1/Xc)^2 + (t12/S)^2;                                     % fibre compression with shear term added from Dong, BETTER
+            I_mt = (s2/Yt)^2 + (t12/S)^2;                                     % matrix tension
+            %I_mc = (s2/(2*S))^2 + ((Yc/(2*S))^2 - 1)*(s2/Yc) + (t12/S)^2;    % matrix compression
+            I_mc = (s2/Yc)^2 + (t12/S)^2;                                     % Dong et al. I_mc, simplified, BETTER
 
+            
             Igate = [g1*I_ft; (1-g1)*I_fc; g2*I_mt; (1-g2)*I_mc];
             H_e = H_e + Igate * wt * jac;
 

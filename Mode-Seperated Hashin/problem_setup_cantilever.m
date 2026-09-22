@@ -74,7 +74,7 @@ nodes_trac = find(coords(1,:)==Lb & coords(2,:)>=y_lo & coords(2,:)<=y_hi);
 nodes_trac = nodes_trac(order);                  % must be sorted along the edge for the segment loop below
 coords_trac = coords(:,nodes_trac);
 
-P_total = -400;                                   % total applied load - tune so stresses approach the strength allowables
+P_total = -1000;                                   % total applied load - tune so stresses approach the strength allowables
 L_trac = coords_trac(2,end) - coords_trac(2,1);   % physical length spanned by the traction nodes
 pres = P_total / L_trac;
 
