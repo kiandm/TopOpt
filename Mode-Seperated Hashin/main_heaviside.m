@@ -8,7 +8,7 @@ clear; clc;
 warning off
 %% Parameters
 volfrac = 0.50; penal = 3.0; rmin_phys = 5; 
-maxiter = 1000; theta_init = pi/2;
+maxiter = 2000; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -177,7 +177,7 @@ while ~converged && iter < maxiter
     end
     % Beta continuation block
     if mod(iter, 10) == 0 && beta < beta_max
-        beta = min(beta*2, beta_max);
+        beta = min(beta*1.5, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
     M = 100 * sum(4*xphy(1:numele).*(1-xphy(1:numele))) / numele;
@@ -256,4 +256,10 @@ ylabel('Hashin mode constraints, g');
 legend('Location', 'best');
 title('Convergence History');
 grid on;
+
+% Save converged results for later checking against other failure criteria
+% (see checkTsaiWu.m)
+saveOptResults(xphy, U, numele, numnode, gs, edofMat, coords, conn, matprop, strength, ...
+    penal, dphix_ref, dphiy_ref, freedofs, F, FailIdx, g_hs, vonMises, iter, M);
+
 toc
