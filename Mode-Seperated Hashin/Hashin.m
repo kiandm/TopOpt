@@ -108,14 +108,15 @@ for e = 1:numele
             dg2_ds2 = k_gate*g2*(1-g2);
 
             dIft_ds1 = 2*s1/Xt^2;  dIft_dt12 = 2*t12/S^2;
-            dIfc_ds1 = 2*s1/Xc^2;
+            dIfc_ds1 = 2*s1/Xc^2;  dIfc_dt12 = 2*t12/S^2;
             dImt_ds2 = 2*s2/Yt^2;  dImt_dt12 = 2*t12/S^2;
-            dImc_ds2 = s2/(2*S^2) + ((Yc/(2*S))^2 - 1)/Yc;  dImc_dt12 = 2*t12/S^2;
+            dImc_ds2 = 2*s2/Yc^2;  dImc_dt12 = 2*t12/S^2;
 
             % Psi columns: d(gated index)/d[s1;s2;t12], one column per mode [ft fc mt mc]
             Psi = zeros(3,nmode);
             Psi(1,1) = dg1_ds1*I_ft + g1*dIft_ds1;         Psi(3,1) = g1*dIft_dt12;
-            Psi(1,2) = -dg1_ds1*I_fc + (1-g1)*dIfc_ds1;
+            % Psi(1,2) = -dg1_ds1*I_fc + (1-g1)*dIfc_ds1;
+            Psi(1,2) = -dg1_ds1*I_fc + (1-g1)*dIfc_ds1;    Psi(3,2) = (1-g1)*dIfc_dt12;
             Psi(2,3) = dg2_ds2*I_mt + g2*dImt_ds2;         Psi(3,3) = g2*dImt_dt12;
             Psi(2,4) = -dg2_ds2*I_mc + (1-g2)*dImc_ds2;    Psi(3,4) = (1-g2)*dImc_dt12;
 

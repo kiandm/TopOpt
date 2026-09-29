@@ -86,9 +86,13 @@ xphy(1:numele) = x_proj;
 p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
 xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
 %% Optimisation loop
-iterationHistory = zeros(maxiter, 5);
-change = 1; iter = 0;
-while change > 1e-3 && iter < maxiter
+iterationHistory = zeros(maxiter, 8);
+change = 1; iter = 0; M = 100;
+converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+while ~converged && iter < maxiter 
+% iterationHistory = zeros(maxiter, 5);
+% change = 1; iter = 0;
+% while change > 1e-3 && iter < maxiter
     iter = iter + 1;
     % Heaviside projection
     x_tilde = (H*xval(1:numele))./Hs;
@@ -171,7 +175,7 @@ while change > 1e-3 && iter < maxiter
     end
     % Beta continuation block
     if mod(iter, 50) == 0 && beta < beta_max
-        beta = min(beta*2, beta_max);
+        beta = min(beta*1.5, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
 end
