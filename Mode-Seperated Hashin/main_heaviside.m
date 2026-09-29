@@ -158,7 +158,7 @@ while ~converged && iter < maxiter
     iterationHistory(iter, :) = [iter, c, v, change, g_hs(1), g_hs(2), g_hs(3), g_hs(4)];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 0
-        figure(5); clf;
+        figure(9); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
@@ -196,7 +196,7 @@ theta_deg = mod(rad2deg(theta_rad)+90, 180)-90; % Extract physical angles and co
 x_dens = xphy(1:numele);
 theta_plot = theta_deg;
 theta_plot(x_dens <= 0.5) = NaN; % Hide void elements
-figure(6); clf;
+figure(10); clf;
 patch('Faces', conn', ...
       'Vertices', coords', ...
       'FaceVertexCData', theta_plot, ...
@@ -222,7 +222,7 @@ y_lines = [y_cen(ind) - halfL*sin(theta_rad(ind)), ... % Fixed: y_cen instead of
            nan(length(ind),1)]';
 line(x_lines(:), y_lines(:), 'Color', [0 0 0 0.5], 'LineWidth', 0.8); % Overlay fiber direction vector lines
 % Hashin failure plot
-figure(7); clf;
+figure(11); clf;
 modeNames = {'Fibre Tension', 'Fibre Compression', 'Matrix Tension', 'Matrix Compression'};
 mask = xphy(1:numele) < 0.3;
 for k = 1:4
@@ -242,7 +242,7 @@ end
 set(gcf, 'Color', 'white');
 drawnow;
 % plot iteration convergence history
-figure(8); clf;
+figure(12); clf;
 yyaxis left
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
 xlabel('Iteration');
