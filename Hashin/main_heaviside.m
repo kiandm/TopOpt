@@ -4,7 +4,7 @@
 % With Heaviside
 tic
 clear; clc; 
-close all;
+% close all;
 warning off
 %% Parameters
 volfrac = 0.50; penal = 3.0; rmin_phys = 5; 
@@ -86,7 +86,7 @@ xphy(1:numele) = x_proj;
 p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
 xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
 %% Optimisation loop
-iterationHistory = zeros(maxiter, 8);
+iterationHistory = zeros(maxiter, 5);
 change = 1; iter = 0; M = 100;
 converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
 while ~converged && iter < maxiter 
@@ -174,10 +174,12 @@ while ~converged && iter < maxiter
         drawnow;
     end
     % Beta continuation block
-    if mod(iter, 50) == 0 && beta < beta_max
+    if mod(iter, 25) == 0 && beta < beta_max
         beta = min(beta*1.5, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
+    M = 100 * sum(4*xphy(1:numele).*(1-xphy(1:numele))) / numele;
+    converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
 end
 warning on
 %%
@@ -244,4 +246,10 @@ ax = gca;
 ax.YAxis(2).Color = 'r';
 title('Convergence History');
 grid on;
+
+% Save converged results for later checking against other failure criteria
+% (see checkTsaiWu.m)
+saveOptResults(xphy, U, numele, numnode, gs, edofMat, coords, conn, matprop, strength, ...
+    penal, dphix_ref, dphiy_ref, freedofs, F, TW, g_hs, vonMises, iter, M);
+
 toc
