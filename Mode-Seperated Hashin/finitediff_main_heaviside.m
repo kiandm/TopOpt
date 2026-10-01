@@ -25,7 +25,8 @@ strength.S=72;
 %%
 % [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin);
 [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin_phys);
-Hs = sum(H,2);
+% Hs = sum(H,2);
+Ht = H';   Hs = full(sum(H,2));
 U = zeros(2*numnode,1);
 gs=gauss_domain(coords,numele,conn,2);
 gs1=gauss_domain(coords,numele,conn,1);    %1 gauss point at the centre
@@ -84,8 +85,9 @@ x_tilde = (H*xval(1:numele))./Hs;
 [x_proj, ~] = heavisideProjection(x_tilde, beta, eta);
 xphy(1:numele) = x_proj;
 %xphy(numele+1:end) = xval(numele+1:end);
-p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+% p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+% xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+xphy(numele+1:end) = 0.5*atan2((H*sin(2*xval(numele+1:end)))./Hs, (H*cos(2*xval(numele+1:end)))./Hs);
 %% Optimisation loop
 iterationHistory = zeros(maxiter, 8);
 change = 1; iter = 0;
@@ -95,6 +97,7 @@ while change > 1e-3 && iter < maxiter
     x_tilde = (H*xval(1:numele))./Hs;
     [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
     xphy(1:numele) = x_proj;
+    xphy(numele+1:end) = 0.5*atan2((H*sin(2*xval(numele+1:end)))./Hs, (H*cos(2*xval(numele+1:end)))./Hs);
     % FE Analysis
     [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
     % Tsai-Wu constraint
@@ -105,30 +108,42 @@ while change > 1e-3 && iter < maxiter
     % Volume constraint and sensitivities
     [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve); 
 %%
-    % filtering of sensitivites 
-    % sensitivities in theta
-    p1_tilde = (H * cos(xval(numele+1:end))) ./ Hs;
-    p2_tilde = (H * sin(xval(numele+1:end))) ./ Hs;
-    R2 = max(p1_tilde.^2 + p2_tilde.^2, 1e-6);
-    dtheta_dp1 = -p2_tilde ./ R2;
-    dtheta_dp2 =  p1_tilde ./ R2;
-    dc_dp1 = dc_theta .* dtheta_dp1;
-    dc_dp2 = dc_theta .* dtheta_dp2;
-    dc_theta = -sin(xval(numele+1:end)) .* (H * (dc_dp1 ./ Hs)) ...
-              + cos(xval(numele+1:end)) .* (H * (dc_dp2 ./ Hs));
-    % dv_dtheta is zero anyway since volume doesn't depend on fibre
-    % direction
-    dgh_dp1 = dgh_dtheta .* dtheta_dp1;
-    dgh_dp2 = dgh_dtheta .* dtheta_dp2;
-    dgh_dtheta = -sin(xval(numele+1:end)) .* (H * (dgh_dp1 ./ Hs)) ...
-                 + cos(xval(numele+1:end)) .* (H * (dgh_dp2 ./ Hs));
-    % sensitivites in x
-    dc_dx_chain   = dc_dx_raw   .* dxphy; % Chain rule
-    dv_dx_chain   = dv_dx_raw   .* dxphy; % Chain rule
-    dgh_dx_chain = dgh_dx_raw .* dxphy; % Chain rule
-    dc_dx   = H * (dc_dx_chain   ./ Hs);  % Filter
-    dv_dx   = H * (dv_dx_chain   ./ Hs);  % Filter
-    dgh_dx = H * (dgh_dx_chain ./ Hs);  % Filter
+    % % filtering of sensitivites 
+    % % sensitivities in theta
+    % p1_tilde = (H * cos(xval(numele+1:end))) ./ Hs;
+    % p2_tilde = (H * sin(xval(numele+1:end))) ./ Hs;
+    % R2 = max(p1_tilde.^2 + p2_tilde.^2, 1e-6);
+    % dtheta_dp1 = -p2_tilde ./ R2;
+    % dtheta_dp2 =  p1_tilde ./ R2;
+    % dc_dp1 = dc_theta .* dtheta_dp1;
+    % dc_dp2 = dc_theta .* dtheta_dp2;
+    % dc_theta = -sin(xval(numele+1:end)) .* (H * (dc_dp1 ./ Hs)) ...
+    %           + cos(xval(numele+1:end)) .* (H * (dc_dp2 ./ Hs));
+    % % dv_dtheta is zero anyway since volume doesn't depend on fibre
+    % % direction
+    % dgh_dp1 = dgh_dtheta .* dtheta_dp1;
+    % dgh_dp2 = dgh_dtheta .* dtheta_dp2;
+    % dgh_dtheta = -sin(xval(numele+1:end)) .* (H * (dgh_dp1 ./ Hs)) ...
+    %              + cos(xval(numele+1:end)) .* (H * (dgh_dp2 ./ Hs));
+    % % sensitivites in x
+    % dc_dx_chain   = dc_dx_raw   .* dxphy; % Chain rule
+    % dv_dx_chain   = dv_dx_raw   .* dxphy; % Chain rule
+    % dgh_dx_chain = dgh_dx_raw .* dxphy; % Chain rule
+    % dc_dx   = H * (dc_dx_chain   ./ Hs);  % Filter
+    % dv_dx   = H * (dv_dx_chain   ./ Hs);  % Filter
+    % dgh_dx = H * (dgh_dx_chain ./ Hs);  % Filter
+    % filtering of sensitivities: each adjoint filter is applied with Ht = H' (NOT H)
+    th      = xval(numele+1:end);
+    q1      = (H*cos(2*th))./Hs;   q2 = (H*sin(2*th))./Hs;   R2 = max(q1.^2 + q2.^2, 1e-6);
+    dth_dq1 = -0.5*q2./R2;         dth_dq2 = 0.5*q1./R2;     % d(theta_tilde)/d(q1,q2),  theta_tilde = 0.5*atan2(q2,q1)
+    sc      = -2*sin(2*th);        cc2     = 2*cos(2*th);    % d(q1,q2)/d(theta)
+    % dv_dtheta is zero anyway since volume doesn't depend on fibre direction
+    dc_theta   = sc.*(Ht*((dc_theta  .*dth_dq1)./Hs)) + cc2.*(Ht*((dc_theta  .*dth_dq2)./Hs));
+    dgh_dtheta = sc.*(Ht*((dgh_dtheta.*dth_dq1)./Hs)) + cc2.*(Ht*((dgh_dtheta.*dth_dq2)./Hs));
+    % sensitivities in x: chain rule through the Heaviside projection, then the adjoint of the density filter
+    dc_dx  = Ht*((dc_dx_raw .*dxphy)./Hs);
+    dv_dx  = Ht*((dv_dx_raw .*dxphy)./Hs);
+    dgh_dx = Ht*((dgh_dx_raw.*dxphy)./Hs);
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Combined objective function sensitivities
      dfdx = [ dv_dx(:).',   dv_theta(:).'  ;
@@ -144,8 +159,8 @@ while change > 1e-3 && iter < maxiter
     xold2 = xold1; xold1 = xval; % Update old values
     xval = xmma;                 % current values of the design variables
     % %filter theta with Cartesian components
-    p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-    xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+    %p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+    %xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
     % xphy(numele+1:end) = (H*xval(numele+1:end))./Hs;
     % Print results
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
@@ -198,37 +213,24 @@ xphy_fd = xval;
 xphy_fd(1:numele) = x_proj_fd;
 
 % Apply theta filter
-p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-xphy_fd(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+% p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+% xphy_fd(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+xphy_fd(numele+1:end) = 0.5*atan2((H*sin(2*xval(numele+1:end)))./Hs, (H*cos(2*xval(numele+1:end)))./Hs);
+
 
 % Baseline quantities
 [U_fd, K_fd, KE0_fd, dK_fd] = FE_analysis(xphy_fd, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
 [c_fd, dc_dx_raw_fd, dc_theta_fd] = objective_function(U_fd, xphy_fd, penal, numele, gs, edofMat, coords, conn, matprop, dphix_ref, dphiy_ref); % ADDED DPHI 
 [g_hs_fd, dgh_dx_raw_fd, dgh_dtheta_fd, FailIdx_fd, vonMises_fd] = Hashin(U_fd, dK_fd, KE0_fd, xphy_fd, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref);
-% Need filtered sensitivites
-dc_dx_chain_fd   = dc_dx_raw_fd   .* dxphy_fd; % Chain rule
-%dv_dx_chain_fd   = dv_dx_raw_fd   .* dxphy_fd; % Chain rule
-dgh_dx_chain_fd = dgh_dx_raw_fd .* dxphy_fd; % Chain rule
-dc_dx_fd   = H * (dc_dx_chain_fd   ./ Hs);  % Filter
-%dv_dx_fd   = H * (dv_dx_chain_fd   ./ Hs);  % Filter
-dgh_dx_fd = H * (dgh_dx_chain_fd ./ Hs);  % Filter
-
-% sensitivities in theta (circular filter, same treatment as the main loop)
-p1_tilde_fd = (H * cos(xval(numele+1:end))) ./ Hs;
-p2_tilde_fd = (H * sin(xval(numele+1:end))) ./ Hs;
-R2_fd = max(p1_tilde_fd.^2 + p2_tilde_fd.^2, 1e-6);
-dtheta_dp1_fd = -p2_tilde_fd ./ R2_fd;
-dtheta_dp2_fd =  p1_tilde_fd ./ R2_fd;
-
-dc_dp1_fd = dc_theta_fd .* dtheta_dp1_fd;
-dc_dp2_fd = dc_theta_fd .* dtheta_dp2_fd;
-dc_dth_fd = -sin(xval(numele+1:end)) .* (H * (dc_dp1_fd ./ Hs)) ...
-           + cos(xval(numele+1:end)) .* (H * (dc_dp2_fd ./ Hs));
-
-dgh_dp1_fd = dgh_dtheta_fd .* dtheta_dp1_fd;
-dgh_dp2_fd = dgh_dtheta_fd .* dtheta_dp2_fd;
-dgh_dth_fd = -sin(xval(numele+1:end)) .* (H * (dgh_dp1_fd ./ Hs)) ...
-            + cos(xval(numele+1:end)) .* (H * (dgh_dp2_fd ./ Hs));
+% Filtered sensitivities (same chain as the main loop; adjoint filters use Ht = H')
+th_fd      = xval(numele+1:end);
+q1_fd      = (H*cos(2*th_fd))./Hs;   q2_fd = (H*sin(2*th_fd))./Hs;   R2_fd = max(q1_fd.^2 + q2_fd.^2, 1e-6);
+dth_dq1_fd = -0.5*q2_fd./R2_fd;      dth_dq2_fd = 0.5*q1_fd./R2_fd;
+sc_fd      = -2*sin(2*th_fd);        cc2_fd     = 2*cos(2*th_fd);
+dc_dth_fd  = sc_fd.*(Ht*((dc_theta_fd  .*dth_dq1_fd)./Hs)) + cc2_fd.*(Ht*((dc_theta_fd  .*dth_dq2_fd)./Hs));
+dgh_dth_fd = sc_fd.*(Ht*((dgh_dtheta_fd.*dth_dq1_fd)./Hs)) + cc2_fd.*(Ht*((dgh_dtheta_fd.*dth_dq2_fd)./Hs));
+dc_dx_fd   = Ht*((dc_dx_raw_fd .*dxphy_fd)./Hs);
+dgh_dx_fd  = Ht*((dgh_dx_raw_fd.*dxphy_fd)./Hs);
 
 filename = ['finitediffoutput_1e-4.txt'];
 fileID = fopen(filename, 'w');
@@ -325,6 +327,7 @@ for e = check_elems % 1:numele
    rel_err_cth(e) = rel_err;
    fprintf(fileID, '%-8d %-14.6e %-14.6e %-14.6e %-10.2e\n', e, dc_dth_analytic, dc_dth_fd_num, abs_err, rel_err);
 end
+fclose(fileID);                      % flush the output file (it was never closed)
 %%
 %% Plot FD validation relative errors spatially on the mesh
 % Run this after the FD-check section, once rel_err_gx, rel_err_gth,

@@ -22,7 +22,9 @@ function [TW, g_tw, vonMises] = checkTsaiWu(filename, doPlot)
 if nargin < 2
     doPlot = true;
 end
-filename = "opt_results_20260922_111004.mat";
+if nargin < 1 || isempty(filename)                 % default: newest result file in this folder
+    d = dir('opt_results_*.mat');  names = sort({d.name});  filename = names{end};      % file names carry a timestamp -> last = newest
+end
 r = load(filename);
 xphy = r.xphy; U = r.U; numele = r.numele; gs = r.gs; edofMat = r.edofMat;
 matprop = r.matprop; strength = r.strength;
@@ -106,41 +108,26 @@ else
 end
 
 if doPlot
+    if isfield(r, 'FailIdx'), FI = r.FailIdx; else, FI = r.TW; end   % mode-separated or collapsed results
     mask = ~solid;
-    figure;
-    subplot(1,2,1);
-    hashin_field = max(r.FailIdx, [], 2);   % worst of the 4 Hashin modes, per element
-    hashin_field(mask) = NaN;
-    patch('Faces', r.conn', 'Vertices', r.coords', 'FaceVertexCData', hashin_field, ...
-          'FaceColor', 'flat', 'EdgeColor', 'none');
-    axis equal off; colorbar; clim([0 1.2]); title('max Hashin sub-mode index (as optimised)');
-
-    subplot(1,2,2);
-    tw_field = TW;
-    tw_field(mask) = NaN;
-    patch('Faces', r.conn', 'Vertices', r.coords', 'FaceVertexCData', tw_field, ...
-          'FaceColor', 'flat', 'EdgeColor', 'none');
-    axis equal off; colorbar; clim([0 1.2]); title('Tsai-Wu index (post-hoc check)');
-    set(gcf, 'Color', 'white');
+    hs_f = max(FI, [], 2);   hs_f(mask) = NaN;                       % worst Hashin sub-mode, per element
+    tw_f = TW;               tw_f(mask) = NaN;
+    d_f  = hs_f - tw_f;                                              % negative = Tsai-Wu is the more critical criterion
+    fields = {hs_f, tw_f, d_f};
+    ttl    = {'max Hashin index (as optimised)', 'Tsai-Wu index (post-hoc)', 'Hashin - Tsai-Wu'};
+    figure; set(gcf, 'Color', 'white');
+    for k = 1:3
+        subplot(1,3,k);
+        patch('Faces', r.conn', 'Vertices', r.coords', 'FaceVertexCData', fields{k}, ...
+              'FaceColor', 'flat', 'EdgeColor', 'none');
+        axis equal off; colorbar; title(ttl{k});
+        if k < 3
+            clim([0 1.2]);
+        else                                                         % diverging scale centred on 0
+            lim = max(abs(d_f));  clim([-lim lim]);
+            colormap(gca, [linspace(0,1,128)' linspace(0,1,128)' ones(128,1); ones(128,1) linspace(1,0,128)' linspace(1,0,128)']);
+        end
+    end
+    fprintf('  max(Hashin - TW) over solid elements = %.3f\n', max(d_f));
 end
-if doPlot
-    mask = ~solid;
-    figure;
-    subplot(1,2,1);
-    hashin_field = max(r.FailIdx, [], 2);   % worst of the 4 Hashin modes, per element
-    hashin_field(mask) = NaN;
-    patch('Faces', r.conn', 'Vertices', r.coords', 'FaceVertexCData', hashin_field, ...
-          'FaceColor', 'flat', 'EdgeColor', 'none');
-    axis equal off; colorbar; clim([0 1.2]); title('max Hashin sub-mode index (as optimised)');
-
-    subplot(1,2,2);
-    tw_field = TW;
-    tw_field(mask) = NaN;
-    diff_field = hashin_field - tw_field;
-    patch('Faces', r.conn', 'Vertices', r.coords', 'FaceVertexCData', diff_field, ...
-          'FaceColor', 'flat', 'EdgeColor', 'none');
-    axis equal off; colorbar; clim([0 1.2]); title('Diff between HS and TW index (post-hoc check)');
-    set(gcf, 'Color', 'white');
-end
-max(diff_field)
 end

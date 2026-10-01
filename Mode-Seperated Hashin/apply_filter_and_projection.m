@@ -12,6 +12,8 @@ function xphy_out = apply_filter_and_projection(xval_in, numele, H, Hs, beta, et
 
     % Angle: direct linear filter
     % xphy_out(numele+1:end) = (H * xval_in(numele+1:end)) ./ Hs;
-    p1 = cos(xval_in(numele+1:end)); p2 = sin(xval_in(numele+1:end));
-    xphy_out(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+    %p1 = cos(xval_in(numele+1:end)); p2 = sin(xval_in(numele+1:end));
+    %xphy_out(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+    xphy_out(numele+1:end) = 0.5*atan2((H*sin(2*xval_in(numele+1:end)))./Hs, (H*cos(2*xval_in(numele+1:end)))./Hs);
+
 end

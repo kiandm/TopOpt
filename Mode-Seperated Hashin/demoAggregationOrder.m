@@ -23,8 +23,8 @@ function demoAggregationOrder()
 % though no single element, in any single mode, actually exceeds its own
 % allowable anywhere.
 
-% Crosses threshold at 92.993% allowable stress fraction with
-% mode-collapsed vs 99.756% mode-separated
+% Crosses threshold at 97.07% allowable stress fraction with mode-collapsed (index squared, like-for-like with the
+% separated I = (s/X)^2 + (t/S)^2) vs 99.76% mode-separated.  (With the un-squared collapsed index it is 92.99%.)
 
 strength.Xt = 1062; strength.Xc = 610; strength.Yt = 31; strength.Yc = 118; strength.S = 72;
 Xt = strength.Xt; Yt = strength.Yt;
@@ -33,11 +33,11 @@ delta_f = 0.05*min(strength.Xt, strength.Xc);
 delta_m = 0.05*min(strength.Yt, strength.Yc);
 eps_max = 1e-3;
 
-% ---- Headline snapshot: both elements at 95% of their own critical mode ----
-frac = 0.95;
+% ---- Headline snapshot: both elements at 98% of their own critical mode ----
+frac = 0.98;
 sA = [frac*Xt, 2.0, 5.0];    % element A: fibre-tension critical, safe elsewhere, material-axis stress [s1, s2, t12], s1 is close to Xt
 sB = [10.0, frac*Yt, 5.0];   % element B: matrix-tension critical, safe elsewhere, material-axis stress [s1, s2, t12], s2 is close to Yt
-% Both stresses are at 95% allowable stress
+% Both stresses are at 98% allowable stress
 
 fprintf('Element A (fibre-critical):  s1=%.1f, s2=%.1f, t12=%.1f\n', sA(1), sA(2), sA(3));
 fprintf('Element B (matrix-critical): s1=%.1f, s2=%.1f, t12=%.1f\n\n', sB(1), sB(2), sB(3));
@@ -49,7 +49,7 @@ g_mt = (ImtA^p + ImtB^p)^(1/p) - 1;
 
 HcA = collapsedIndex(sA, strength, delta_f, delta_m, eps_max);
 HcB = collapsedIndex(sB, strength, delta_f, delta_m, eps_max);
-g_h = (HcA^p + HcB^p)^(1/p) - 1;
+g_h = (HcA^(2*p) + HcB^(2*p))^(1/p) - 1;
 
 fprintf('---- mode-separated (this project''s Hashin.m) ----\n');
 fprintf('  g_ft = %+.4f  (%s)\n', g_ft, passFail(g_ft));
@@ -64,7 +64,7 @@ if g_h > 0 && g_ft <= 0 && g_mt <= 0
 end
 
 % ---- Sweep: how far apart are the two formulations across criticality? ----
-fracs = 0:0.02:1.0;
+fracs = 0.5:0.01:1.0;
 g_sep_sweep = zeros(size(fracs));
 g_h_sweep   = zeros(size(fracs));
 for k = 1:numel(fracs)
@@ -79,7 +79,7 @@ for k = 1:numel(fracs)
 
     HcA_k = collapsedIndex(sA_k, strength, delta_f, delta_m, eps_max);
     HcB_k = collapsedIndex(sB_k, strength, delta_f, delta_m, eps_max);
-    g_h_sweep(k) = (HcA_k^p + HcB_k^p)^(1/p) - 1;
+    g_h_sweep(k) = (HcA_k^(2*p) + HcB_k^(2*p))^(1/p) - 1;
 end
 
 figure;
@@ -88,7 +88,7 @@ plot(fracs*100, g_h_sweep, 'g-.', 'LineWidth', 1.5);
 yline(0, 'k:');
 xlabel('Each element''s stress, as a % of its own critical mode''s allowable');
 ylabel('Constraint value g (<=0 is feasible)');
-legend('worst of g_{ft}, g_{mt} (separated)', 'g_h (collapsed)', 'feasibility boundary', 'Location', 'best');
+legend('worst of g_{ft}, g_{mt} (separated)', 'g_h (collapsed, squared index)', 'feasibility boundary', 'Location', 'best');
 title('Constraint value against percentage of critical stress, showing difference in feasibility');
 grid on;
 end
