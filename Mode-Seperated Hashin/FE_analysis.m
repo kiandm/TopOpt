@@ -14,8 +14,10 @@ function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat
          0, 0, G12];
     % Total degrees of freedom
     ndof = 2 * numnode;
+    Emin = 1e-9;                   % relative void stiffness (floor)
     % Initialize global stiffness matrix and force vector
     KE_all = zeros(8,8,numele); % (NEW)
+    KEu_all = zeros(8,8,numele);   % unit-density element matrices (for the stiffness floor)
     gcount=0; 
     for ee=1:numele
         % Compute the inverse of rotation matrix
@@ -28,7 +30,7 @@ function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat
        % coordiantes x,y
        Cxy= Tinv * C12 * Tinv';
        % Scale the rotated stiffness matrix
-       Cxy = x(ee)^penal*Cxy;
+       %Cxy = x(ee)^penal*Cxy;
        KE=zeros(8,8); 
        for ii=1:4
            gcount=gcount+1; gg=gs(:,gcount);
@@ -39,13 +41,15 @@ function [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat
            Bmat(3,1:2:end)=dphiy;  Bmat(3,2:2:end)=dphix;
            KE=KE+jac*weight*Bmat'*Cxy*Bmat;
        end 
-       KE_all(:,:,ee) = KE;
+       %KE_all(:,:,ee) = KE;
+       KEu_all(:,:,ee) = KE;   KE_all(:,:,ee) = x(ee)^penal*KE;
     end 
     KE0 = KE_all;
     % Vectorised sparse assembly (NEW)
     iK = reshape(kron(edofMat, ones(8,1))',64*numele,1);
     jK = reshape(kron(edofMat, ones(1,8))',64*numele,1);
-    sK = reshape(KE_all,64*numele,1);
+    %sK = reshape(KE_all,64*numele,1);
+    sK = reshape(KE_all + Emin*KEu_all,64*numele,1);   % + void stiffness floor
     K = sparse(iK,jK,sK,ndof,ndof);
     K = (K+K')/2; % symmetrize away floating-point round-off from summed duplicates
     % Factorize once and reuse for both the primal solve below and the

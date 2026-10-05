@@ -50,6 +50,7 @@ for e = 1:numele
     H_e   = 0.0; dHdx_e = 0.0;
     fadj_e = zeros(ndof,1); dH_dth_e = 0.0;
     dKE_dth   = zeros(8,8); gcount = (e-1)*4;
+    Ae = sum(gs(6,(e-1)*4+(1:4)) .* gs(7,(e-1)*4+(1:4)));      % element area: the index is AREA-AVERAGED (mesh independent)
     for i = 1:2
         for j = 1:2
             gcount = gcount + 1;
@@ -79,8 +80,8 @@ for e = 1:numele
             s2c = min(max(s2, -delta_m), delta_m);
             Hm = 0.75*(Yt-Yc)*(s2c/delta_m - s2c^3/(3*delta_m^3)) + (Yt+Yc)/2;
             
-            FI_f = sqrt((s1/Hf)^2 + (t12/S)^2);         % Eq. 13
-            FI_m = sqrt((s2/Hm)^2 + (t12/S)^2);         % Eq. 14           
+            FI_f = sqrt((s1/Hf)^2 + (t12/S)^2 + 1e-12);         % Eq. 13
+            FI_m = sqrt((s2/Hm)^2 + (t12/S)^2 + 1e-12);         % Eq. 14           
             diff_fm = FI_f - FI_m;
             root_fm = sqrt(diff_fm^2 + eps_max);
             H_gp = 0.5*((FI_f+FI_m) + root_fm - sqrt(eps_max));   % Eq. 16 (corrected)          
@@ -104,12 +105,12 @@ for e = 1:numele
             % Density
             dsig_dx = q * xdens^(q-1) * sig_unscaled;
             dHdx_gp = psi' * dsig_dx;
-            dHdx_e  = dHdx_e + dHdx_gp * wt * jac;
+            dHdx_e  = dHdx_e + dHdx_gp * wt * jac / Ae;
             dH_dth_gp = psi' * (xdens^q * C0 * dT_eps_dth * (B * Ue));
-            dH_dth_e  = dH_dth_e + dH_dth_gp * wt * jac;
+            dH_dth_e  = dH_dth_e + dH_dth_gp * wt * jac / Ae;
             % Adjoint RHS contribution
             fadj_gp = B' * T_eps' * C0' * psi * xdens^q;
-            fadj_e = fadj_e + fadj_gp * wt * jac;
+                        fadj_e = fadj_e + fadj_gp * wt * jac / Ae;
         end
     end
     HashinIdx(e) = H_e;

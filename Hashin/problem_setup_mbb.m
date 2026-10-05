@@ -81,11 +81,12 @@ for cc=1:numele
     difx=abs((gpos(1,1)-xi(1,:))); 
     dify=abs((gpos(2,1)-xi(2,:))); 
     dif=sqrt(difx.^2 + dify.^2); 
-    rij=dif./sqrt(dm_cells(1,v).^2 + dm_cells(2,v).^2);
-    wij=(rmin-rij)./rmin; 
+    % rij=dif./sqrt(dm_cells(1,v).^2 + dm_cells(2,v).^2);
+    % wij=(rmin-rij)./rmin; 
+    wij = max(rmin*xspac - dif, 0) / (rmin*xspac);     % cone filter of physical radius rmin*xspac (same definition as problem_setup_Lbrac60)
     W(cc,v)=wij; 
 end
-W=W./sum(W,2); 
+%W=W./sum(W,2); 
 W=sparse(W); 
 
 % figure

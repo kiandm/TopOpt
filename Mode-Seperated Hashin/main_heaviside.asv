@@ -4,10 +4,10 @@
 % With Heaviside
 tic
 clear; clc; 
-%close all;
-warning off
+close all;
+%warning off
 %% Parameters
-volfrac = 0.50; penal = 3.0; rmin_phys = 5; 
+volfrac = 0.40; penal = 3.0; rmin_phys = 5; 
 maxiter = 3000; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
@@ -47,6 +47,7 @@ for i=1:numele
 end
 % Initialise design variables and combine
 x = volfrac * ones(numele,1);                % Density variables
+% x = 1 * ones(numele,1);                % Density variables
 theta = theta_init * ones(numele,1);         % Fiber direction variables
 xval = [x; theta];                           % Combine design variables
 % Bounds for densities and fiber directions
@@ -75,12 +76,8 @@ xphy=xval;                          % Filter design variable
 % (xphy is used only in FE_analysis, objective_function, and final plotting but is not not used in the MMA. In the MMA unfiltered x i used)
 %%
 % Precompute element centroids
-x_cen=zeros(numele,1); y_cen=x_cen; 
-for i=1:numele
-    xrow = coords(1,:); yrow = coords(2,:);
-    x_cen = mean(xrow(conn), 1)';
-    y_cen = mean(yrow(conn), 1)';
-end 
+xrow = coords(1,:); yrow = coords(2,:);
+x_cen = mean(xrow(conn), 1)';   y_cen = mean(yrow(conn), 1)';
 barLength = 1;              % Total bar length for fibre angle plotting
 halfL = barLength / 2;      % plot from middle of element
 % Heaviside projection
@@ -88,17 +85,19 @@ x_tilde = (H*xval(1:numele))./Hs;
 [x_proj, ~] = heavisideProjection(x_tilde, beta, eta);
 xphy(1:numele) = x_proj;
 p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+xphy(numele+1:end) = 0.5*atan2((H*sin(2*xval(numele+1:end)))./Hs, (H*cos(2*xval(numele+1:end)))./Hs);
 %% Optimisation loop
 iterationHistory = zeros(maxiter, 8);
 change = 1; iter = 0; M = 100;
-converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+itb = inf;
+converged = (beta >= 25) && (change <= 1e-3) && (M <= 5); % beta_max
 while ~converged && iter < maxiter    
     iter = iter + 1;
     % Heaviside projection
     x_tilde = (H*xval(1:numele))./Hs;
     [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
     xphy(1:numele) = x_proj;
+    xphy(numele+1:end) = 0.5*atan2((H*sin(2*xval(numele+1:end)))./Hs, (H*cos(2*xval(numele+1:end)))./Hs);
     % FE Analysis
     [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
     % Hashin constraint
@@ -108,30 +107,19 @@ while ~converged && iter < maxiter
     % Volume constraint and sensitivities
     [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve); 
 %%
-    % filtering of sensitivites 
-    % sensitivities in theta
-    p1_tilde = (H * cos(xval(numele+1:end))) ./ Hs; 
-    p2_tilde = (H * sin(xval(numele+1:end))) ./ Hs; 
-    R2 = max(p1_tilde.^2 + p2_tilde.^2, 1e-6);
-    dtheta_dp1 = -p2_tilde ./ R2;
-    dtheta_dp2 =  p1_tilde ./ R2;
-    dc_dp1 = dc_theta .* dtheta_dp1;
-    dc_dp2 = dc_theta .* dtheta_dp2;
-    dc_theta = -sin(xval(numele+1:end)) .* (H * (dc_dp1 ./ Hs)) ...
-              + cos(xval(numele+1:end)) .* (H * (dc_dp2 ./ Hs));
-    % dv_dtheta is zero anyway since volume doesn't depend on fibre
-    % direction
-    dgh_dp1 = dgh_dtheta .* dtheta_dp1;
-    dgh_dp2 = dgh_dtheta .* dtheta_dp2;
-    dgh_dtheta = -sin(xval(numele+1:end)) .* (H * (dgh_dp1 ./ Hs)) ...
-                 + cos(xval(numele+1:end)) .* (H * (dgh_dp2 ./ Hs));
-    % sensitivites in x
-    dc_dx_chain   = dc_dx_raw   .* dxphy;          % Chain rule
-    dv_dx_chain   = dv_dx_raw   .* dxphy;          % Chain rule
-    dgh_dx_chain = dgh_dx_raw .* dxphy;            % Chain rule
-    dc_dx   = H * (dc_dx_chain   ./ Hs);           % Filter
-    dv_dx   = H * (dv_dx_chain   ./ Hs);           % Filter
-    dgh_dx = H * (dgh_dx_chain ./ Hs);             % Filter
+    % filtering of sensitivities: each adjoint filter is applied with Ht = H' (NOT H)
+    th      = xval(numele+1:end);
+    q1      = (H*cos(2*th))./Hs;   q2 = (H*sin(2*th))./Hs;   R2 = max(q1.^2 + q2.^2, 1e-6);
+    dth_dq1 = -0.5*q2./R2;         dth_dq2 = 0.5*q1./R2;     % d(theta_tilde)/d(q1,q2),  theta_tilde = 0.5*atan2(q2,q1)
+    sc      = -2*sin(2*th);        cc2     = 2*cos(2*th);    % d(q1,q2)/d(theta)
+    % dv_dtheta is zero anyway since volume doesn't depend on fibre direction
+    dc_theta   = sc.*(Ht*((dc_theta  .*dth_dq1)./Hs)) + cc2.*(Ht*((dc_theta  .*dth_dq2)./Hs));
+    dgh_dtheta = sc.*(Ht*((dgh_dtheta.*dth_dq1)./Hs)) + cc2.*(Ht*((dgh_dtheta.*dth_dq2)./Hs));
+    % sensitivities in x: chain rule through the Heaviside projection, then the adjoint of the density filter
+    dc_dx  = Ht*((dc_dx_raw .*dxphy)./Hs);
+    dv_dx  = Ht*((dv_dx_raw .*dxphy)./Hs);
+    dgh_dx = Ht*((dgh_dx_raw.*dxphy)./Hs);
+
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Combined objective function sensitivities
     dfdx = [ dv_dx(:).',   dv_theta(:).'  ;
@@ -139,7 +127,8 @@ while ~converged && iter < maxiter
  %%
     % Initial values for MMA
     f0val = c;             % Initial objective function value
-    fval = [v; g_hs];      % Initial volume constraint value    
+    fval = [v; g_hs];      % Initial volume constraint value 
+    fval(1) = 100*fval(1);   dfdx(1,:) = 100*dfdx(1,:);   % volume row scaled for MMA (dv/dx per element ~ O(raa0))
     % MMA update
     [xmma, ~, ~, ~, ~, ~, ~, ~, ~, low1, upp1] = mmasub(m, n, iter, xval, xmin,...
         xmax, xold1, xold2, f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d);
@@ -147,8 +136,8 @@ while ~converged && iter < maxiter
     xold2 = xold1; xold1 = xval; % Update old values
     xval = xmma;                 % current values of the design variables
     % %filter theta with Cartesian components
-    p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-    xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+    %p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+    %xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
     % Print results
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
@@ -181,7 +170,13 @@ while ~converged && iter < maxiter
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
     M = 100 * sum(4*xphy(1:numele).*(1-xphy(1:numele))) / numele;
-    converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+    % converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+        if beta >= beta_max && ~isfinite(itb), itb = iter; end        % iteration at which beta reached beta_max
+    win        = 20;
+    stationary = (iter - itb >= win) && ...
+                 (max(iterationHistory(iter-win+1:iter,2)) - min(iterationHistory(iter-win+1:iter,2))) / iterationHistory(iter,2) < 1e-3;
+    feasible   = max([v; g_hs]) <= 1e-2;
+    converged  = (beta >= beta_max) && (M <= 5) && stationary && feasible;
 end
 warning on
 %%

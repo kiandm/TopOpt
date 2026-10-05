@@ -8,7 +8,7 @@ close all;
 warning off
 % Run 25 iterations first to do central finite difference
 %% Parameters
-volfrac = 0.4; penal = 3.0; rmin_phys = 5; maxiter = 75; theta_init = pi/2;
+volfrac = 0.4; penal = 3.0; rmin_phys = 5; maxiter = 85; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -189,8 +189,8 @@ while change > 1e-3 && iter < maxiter
         drawnow;
     end
     % Beta continuation block
-    if mod(iter, 50) == 0 && beta < beta_max
-        beta = min(beta*2, beta_max);
+    if mod(iter, 25) == 0 && beta < beta_max
+        beta = min(beta*1.5, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
 end

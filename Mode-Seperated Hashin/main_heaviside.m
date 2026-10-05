@@ -4,12 +4,12 @@
 % With Heaviside
 tic
 clear; clc; 
-%close all;
-warning off
+close all;
+%warning off
 %% Parameters
 volfrac = 0.50; penal = 3.0; rmin_phys = 5; 
 maxiter = 3000; theta_init = pi/2;
-beta = 1; beta_max = 32; eta = 0.5;
+beta = 1; beta_max = 64; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
 matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction
@@ -47,6 +47,7 @@ for i=1:numele
 end
 % Initialise design variables and combine
 x = volfrac * ones(numele,1);                % Density variables
+% x = 1 * ones(numele,1);                % Density variables
 theta = theta_init * ones(numele,1);         % Fiber direction variables
 xval = [x; theta];                           % Combine design variables
 % Bounds for densities and fiber directions
@@ -88,7 +89,8 @@ xphy(numele+1:end) = 0.5*atan2((H*sin(2*xval(numele+1:end)))./Hs, (H*cos(2*xval(
 %% Optimisation loop
 iterationHistory = zeros(maxiter, 8);
 change = 1; iter = 0; M = 100;
-converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+itb = inf;
+converged = (beta >= 25) && (change <= 1e-3) && (M <= 5); % beta_max
 while ~converged && iter < maxiter    
     iter = iter + 1;
     % Heaviside projection
@@ -125,7 +127,8 @@ while ~converged && iter < maxiter
  %%
     % Initial values for MMA
     f0val = c;             % Initial objective function value
-    fval = [v; g_hs];      % Initial volume constraint value    
+    fval = [v; g_hs];      % Initial volume constraint value 
+    fval(1) = 100*fval(1);   dfdx(1,:) = 100*dfdx(1,:);   % volume row scaled for MMA (dv/dx per element ~ O(raa0))
     % MMA update
     [xmma, ~, ~, ~, ~, ~, ~, ~, ~, low1, upp1] = mmasub(m, n, iter, xval, xmin,...
         xmax, xold1, xold2, f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d);
@@ -162,12 +165,18 @@ while ~converged && iter < maxiter
         drawnow;
     end
     % Beta continuation block
-    if mod(iter, 25) == 0 && beta < beta_max
-        beta = min(beta*1.5, beta_max);
+    if mod(iter, 50) == 0 && beta < beta_max
+        beta = min(beta*2, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
     M = 100 * sum(4*xphy(1:numele).*(1-xphy(1:numele))) / numele;
-    converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+    % converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+        if beta >= beta_max && ~isfinite(itb), itb = iter; end        % iteration at which beta reached beta_max
+    win        = 20;
+    stationary = (iter - itb >= win) && ...
+                 (max(iterationHistory(iter-win+1:iter,2)) - min(iterationHistory(iter-win+1:iter,2))) / iterationHistory(iter,2) < 1e-3;
+    feasible   = max([v; g_hs]) <= 1e-2;
+    converged  = (beta >= beta_max) && (M <= 5) && stationary && feasible;
 end
 warning on
 %%

@@ -76,15 +76,27 @@ f0val,df0dx,fval,dfdx,low,upp,a0,a,c,d)
 % eeem = ones(m,1);
 % zeron = zeros(n,1);
 
-% Zahur
-epsimin = sqrt(m+n)*10^(-9);
+% % Zahur
+% epsimin = sqrt(m+n)*10^(-9);
+% epsimin = 10^(-8);
+% raa0 = 0.01;
+% move = 1.0;
+% albefa = 0.4;
+% asyinit = 0.5;
+% asyincr = 1.5;
+% asydecr = 0.8;
+% eeen = ones(n,1);
+% eeem = ones(m,1);
+% zeron = zeros(n,1);
+
+% New
 epsimin = 10^(-8);
 raa0 = 0.01;
-move = 1.0;
-albefa = 0.4;
+move = 0.3;
+albefa = 0.1;
 asyinit = 0.5;
-asyincr = 1.5;
-asydecr = 0.8;
+asyincr = 1.2;
+asydecr = 0.7;
 eeen = ones(n,1);
 eeem = ones(m,1);
 zeron = zeros(n,1);

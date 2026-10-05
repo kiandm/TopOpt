@@ -24,7 +24,8 @@ strength.Yc=118;                                 % Transverse direction compress
 strength.S=72;                                   % Shear term (MPa)
 %%
 [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin_phys);
-Hs = sum(H,2);
+Hs = full(sum(H,2));      % full vector (sum of a sparse matrix is sparse)
+Ht = H';                  % transpose: used for every ADJOINT (sensitivity) filter below
 U = zeros(2*numnode,1);
 gs=gauss_domain(coords,numele,conn,2);
 gs1=gauss_domain(coords,numele,conn,1);    %1 gauss point at the centre
@@ -71,20 +72,17 @@ xphy=xval;                          % Filter design variable
 % (xphy is used only in FE_analysis, objective_function, and final plotting but is not not used in the MMA. In the MMA unfiltered x i used)
 %%
 % Precompute element centroids
-x_cen=zeros(numele,1); y_cen=x_cen; 
-for i=1:numele
-    xrow = coords(1,:); yrow = coords(2,:);
-    x_cen = mean(xrow(conn), 1)';
-    y_cen = mean(yrow(conn), 1)';
-end 
+xrow = coords(1,:); yrow = coords(2,:);
+x_cen = mean(xrow(conn), 1)';   y_cen = mean(yrow(conn), 1)';
 barLength = 1;              % Total bar length for fibre angle plotting
 halfL = barLength / 2;      % plot from middle of element
 % Heaviside projection
 x_tilde = (H*xval(1:numele))./Hs;
 [x_proj, ~] = heavisideProjection(x_tilde, beta, eta);
 xphy(1:numele) = x_proj;
-p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+% p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+% xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+xphy(numele+1:end) = filterTheta(xval(numele+1:end), H, Hs);
 %% Optimisation loop
 iterationHistory = zeros(maxiter, 5);
 change = 1; iter = 0; M = 100;
@@ -98,6 +96,7 @@ while ~converged && iter < maxiter
     x_tilde = (H*xval(1:numele))./Hs;
     [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
     xphy(1:numele) = x_proj;
+    xphy(numele+1:end) = filterTheta(xval(numele+1:end), H, Hs);
     % FE Analysis
     [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
     % Hashin constraint
@@ -107,30 +106,18 @@ while ~converged && iter < maxiter
     % Volume constraint and sensitivities
     [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve); 
 %%
-    % filtering of sensitivites 
-    % sensitivities in theta
-    p1_tilde = (H * cos(xval(numele+1:end))) ./ Hs; 
-    p2_tilde = (H * sin(xval(numele+1:end))) ./ Hs; 
-    R2 = max(p1_tilde.^2 + p2_tilde.^2, 1e-6);
-    dtheta_dp1 = -p2_tilde ./ R2;
-    dtheta_dp2 =  p1_tilde ./ R2;
-    dc_dp1 = dc_theta .* dtheta_dp1;
-    dc_dp2 = dc_theta .* dtheta_dp2;
-    dc_theta = -sin(xval(numele+1:end)) .* (H * (dc_dp1 ./ Hs)) ...
-              + cos(xval(numele+1:end)) .* (H * (dc_dp2 ./ Hs));
-    % dv_dtheta is zero anyway since volume doesn't depend on fibre
-    % direction
-    dgh_dp1 = dgh_dtheta .* dtheta_dp1;
-    dgh_dp2 = dgh_dtheta .* dtheta_dp2;
-    dgh_dtheta = -sin(xval(numele+1:end)) .* (H * (dgh_dp1 ./ Hs)) ...
-                 + cos(xval(numele+1:end)) .* (H * (dgh_dp2 ./ Hs));
-    % sensitivites in x
-    dc_dx_chain   = dc_dx_raw   .* dxphy;          % Chain rule
-    dv_dx_chain   = dv_dx_raw   .* dxphy;          % Chain rule
-    dgh_dx_chain = dgh_dx_raw .* dxphy;            % Chain rule
-    dc_dx   = H * (dc_dx_chain   ./ Hs);           % Filter
-    dv_dx   = H * (dv_dx_chain   ./ Hs);           % Filter
-    dgh_dx = H * (dgh_dx_chain ./ Hs);             % Filter
+        % filtering of sensitivities: each adjoint filter is applied with Ht = H' (NOT H)
+    th      = xval(numele+1:end);
+    q1      = (H*cos(2*th))./Hs;   q2 = (H*sin(2*th))./Hs;   R2 = max(q1.^2 + q2.^2, 1e-6);
+    dth_dq1 = -0.5*q2./R2;         dth_dq2 = 0.5*q1./R2;     % d(theta_tilde)/d(q1,q2),  theta_tilde = 0.5*atan2(q2,q1)
+    sc      = -2*sin(2*th);        cc2     = 2*cos(2*th);    % d(q1,q2)/d(theta)
+    % dv_dtheta is zero anyway since volume doesn't depend on fibre direction
+    dc_theta   = sc.*(Ht*((dc_theta  .*dth_dq1)./Hs)) + cc2.*(Ht*((dc_theta  .*dth_dq2)./Hs));
+    dgh_dtheta = sc.*(Ht*((dgh_dtheta.*dth_dq1)./Hs)) + cc2.*(Ht*((dgh_dtheta.*dth_dq2)./Hs));
+    % sensitivities in x: chain rule through the Heaviside projection, then the adjoint of the density filter
+    dc_dx  = Ht*((dc_dx_raw .*dxphy)./Hs);
+    dv_dx  = Ht*((dv_dx_raw .*dxphy)./Hs);
+    dgh_dx = Ht*((dgh_dx_raw.*dxphy)./Hs);
     % Combine sensitivities
     df0dx = [dc_dx; dc_theta];                     % Combined objective function sensitivities
     dfdx = [ dv_dx(:).',      dv_theta(:).'  ;
@@ -146,8 +133,8 @@ while ~converged && iter < maxiter
     xold2 = xold1; xold1 = xval; % Update old values
     xval = xmma;                 % current values of the design variables
     % %filter theta with Cartesian components
-    p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-    xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+    % p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+    % xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
     % Print results
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
