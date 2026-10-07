@@ -5,10 +5,11 @@
 tic
 clear; clc; 
 close all;
-%warning off
+% warning off
+addpath('Functions\')
 %% Parameters
-volfrac = 0.40; penal = 3.0; rmin_phys = 5; 
-maxiter = 3000; theta_init = pi/2;
+volfrac = 0.40; penal = 3.0; rmin_phys = 4; 
+maxiter = 1000; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
@@ -147,7 +148,7 @@ while ~converged && iter < maxiter
     iterationHistory(iter, :) = [iter, c, v, change, g_hs(1), g_hs(2), g_hs(3), g_hs(4)];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 0
-        figure(9); clf;
+        figure(5); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
@@ -165,7 +166,7 @@ while ~converged && iter < maxiter
         drawnow;
     end
     % Beta continuation block
-    if mod(iter, 25) == 0 && beta < beta_max
+    if mod(iter, 50) == 0 && beta < beta_max
         beta = min(beta*1.5, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
@@ -191,7 +192,7 @@ theta_deg = mod(rad2deg(theta_rad)+90, 180)-90; % Extract physical angles and co
 x_dens = xphy(1:numele);
 theta_plot = theta_deg;
 theta_plot(x_dens <= 0.5) = NaN; % Hide void elements
-figure(10); clf;
+figure(6); clf;
 patch('Faces', conn', ...
       'Vertices', coords', ...
       'FaceVertexCData', theta_plot, ...
@@ -217,7 +218,7 @@ y_lines = [y_cen(ind) - halfL*sin(theta_rad(ind)), ... % Fixed: y_cen instead of
            nan(length(ind),1)]';
 line(x_lines(:), y_lines(:), 'Color', [0 0 0 0.5], 'LineWidth', 0.8); % Overlay fiber direction vector lines
 % Hashin failure plot
-figure(11); clf;
+figure(7); clf;
 modeNames = {'Fibre Tension', 'Fibre Compression', 'Matrix Tension', 'Matrix Compression'};
 mask = xphy(1:numele) < 0.3;
 for k = 1:4
@@ -237,7 +238,7 @@ end
 set(gcf, 'Color', 'white');
 drawnow;
 % plot iteration convergence history
-figure(12); clf;
+figure(8); clf;
 yyaxis left
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
 xlabel('Iteration');

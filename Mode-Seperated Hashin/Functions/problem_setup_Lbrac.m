@@ -1,12 +1,11 @@
 function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= ...
-    problem_setup_Lbrac60(rmin_phys)                     
-% rmin_phys: filter radius in physical length units (same as coords)                           
-ndiv=150;  %150, 100, 50, 30 use multiple of 5                           
+    problem_setup_Lbrac(rmin)                     
+                           
+ndiv=100;  %150, 100, 50, 30 use multiple of 5                           
 size_cell=100/ndiv;
-rmin = rmin_phys / size_cell; % cells spanning the physical radius at this mesh density
 
-[x2d1, y2d1]=meshgrid(0:size_cell:40,   100:-size_cell:0); 
-[x2d2, y2d2]=meshgrid(40+size_cell:size_cell:100, 40:-size_cell:0); 
+[x2d1 y2d1]=meshgrid(0:size_cell:50,   100:-size_cell:0); 
+[x2d2 y2d2]=meshgrid(50+size_cell:size_cell:100, 50:-size_cell:0); 
 
 size1=size(x2d1); numnode1=size1(1)*size1(2); 
 size2=size(x2d2); numnode2=size2(1)*size2(2); 
@@ -27,7 +26,7 @@ x=[x1 x2]; coords=x;
 %to find the nodes for each cell
 count1=1;
 count2=1; 
-for i=1:40/size_cell %length wise 
+for i=1:50/size_cell %length wise 
     for j=1:100/size_cell %width wise
         conn1(1,count1)=count2+1;
         conn1(2,count1)=conn1(1,count1)+ndiv+1;
@@ -40,11 +39,11 @@ for i=1:40/size_cell %length wise
 end
                             
 count1=1;
-count2=ndiv*((40/size_cell)+1)+1; 
-for i=1:(100-40)/size_cell
-    for j=1:40/size_cell
+count2=ndiv*((50/size_cell)+1)+1; 
+for i=1:(100-50)/size_cell
+    for j=1:50/size_cell
         conn2(1,count1)=count2+1;
-        conn2(2,count1)=conn2(1,count1)+(40/size_cell)+1;
+        conn2(2,count1)=conn2(1,count1)+(50/size_cell)+1;
         conn2(3,count1)=conn2(2,count1)-1;
         conn2(4,count1)=conn2(1,count1)-1;
         count1=count1+1;
@@ -77,24 +76,19 @@ yspac=size_cell;
 % dm(2,1:numnode)=dmax*(yspac*ones(1,numnode));
 
 %Traction boundary (point load)
-nodes_trac=find(coords(2,:)==40 & coords(1,:)>95); 
+nodes_trac=find(coords(2,:)==50 & coords(1,:)>=90); 
 % nodes_trac=find(coords(1,:)==100 & coords(2,:)>=30); 
 coords_trac=coords(:,nodes_trac); 
 
-P_total = -200; % Total applied load in physical units
-% pres=-50; % -50 for ndiv=100, -100 for ndiv=50, -42.857 for ndiv=150
+pres=-1; 
 F=zeros(2*numnode,1); 
 
 %Traction boundary (point load)
-%area=abs(coords(1,nodes_trac(2))-coords(1,nodes_trac(1))); 
-L_trac = coords_trac(1,end) - coords_trac(1,1); % actual physical length spanned by the traction nodes
-pres = P_total / L_trac; % distributed load per unit length, auto-adjusts with mesh
+area=abs(coords(1,nodes_trac(2))-coords(1,nodes_trac(1))); 
 for el=1:length(nodes_trac)-1
-    %F(2*nodes_trac(el))  =F(2*nodes_trac(el))  +pres*area/2;
-    %F(2*nodes_trac(el+1))=F(2*nodes_trac(el+1))+pres*area/2;
-    area_el = abs(coords(1,nodes_trac(el+1)) - coords(1,nodes_trac(el))); % this segment's actual length
-    F(2*nodes_trac(el))  =F(2*nodes_trac(el))  +pres*area_el/2;
-    F(2*nodes_trac(el+1))=F(2*nodes_trac(el+1))+pres*area_el/2;
+    F(2*nodes_trac(el))  =F(2*nodes_trac(el))  +pres*area/2;
+    F(2*nodes_trac(el+1))=F(2*nodes_trac(el+1))+pres*area/2;
+
 end
 
 
@@ -116,15 +110,13 @@ for cc=1:numele
     difx=abs((gpos(1,1)-xi(1,:))); 
     dify=abs((gpos(2,1)-xi(2,:))); 
     dif=sqrt(difx.^2 + dify.^2); 
-    % rij=dif./sqrt(dm_cells(1,v).^2 + dm_cells(2,v).^2);
-    % wij=(rmin-rij)./rmin; 
-    % W(cc,v)=wij; 
-    wij = max(rmin_phys - dif, 0) / rmin_phys;
-    W(cc,v)=wij;
+    rij=dif./sqrt(dm_cells(1,v).^2 + dm_cells(2,v).^2);
+    wij=(rmin-rij)./rmin; 
+    W(cc,v)=wij; 
 end
-% W=W./sum(W,2);   % remove this line — return raw symmetric weights
+W=W./sum(W,2); 
 W=sparse(W); 
-                        
+
 % figure
 % patch('Faces',conn','Vertices',coords','LineWidth',1,...
 %       'FaceColor',[0,153/255,153/255],'EdgeColor','k'); 
@@ -136,8 +128,4 @@ W=sparse(W);
 % 
 % xlabel('x','fontsize',14); ylabel('y','fontsize',14);
 % axis equal 
-
-
-
-
-
+                        

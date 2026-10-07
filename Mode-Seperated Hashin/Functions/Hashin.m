@@ -60,7 +60,7 @@ for e = 1:numele
     H_e = zeros(nmode,1); dHdx_e = zeros(nmode,1); dH_dth_e = zeros(nmode,1);
     fadj_e = zeros(ndof,nmode);
     dKE_dth = zeros(ndof,ndof); gcount = (e-1)*4;
-
+    Ae = sum(gs(6,(e-1)*4+(1:4)) .* gs(7,(e-1)*4+(1:4)));
     for i = 1:2
         for j = 1:2
 
@@ -93,15 +93,15 @@ for e = 1:numele
             g2 = 1/(1+exp(-k_gate*s2));   % ~1 in matrix tension, ~0 in matrix compression
 
             I_ft = (s1/Xt)^2 + (t12/S)^2;                                     % fibre tension
-            I_fc = (s1/Xc)^2;                                                % fibre compression
-            %I_fc = (s1/Xc)^2 + (t12/S)^2;                                     % fibre compression with shear term added from Dong, BETTER
+            %I_fc = (s1/Xc)^2;                                                % fibre compression
+            I_fc = (s1/Xc)^2 + (t12/S)^2;                                     % fibre compression with shear term added from Dong, BETTER
             I_mt = (s2/Yt)^2 + (t12/S)^2;                                     % matrix tension
             % I_mc = (s2/(2*S))^2 + ((Yc/(2*S))^2 - 1)*(s2/Yc) + (t12/S)^2;    % matrix compression
-            %I_mc = (s2/Yc)^2 + (t12/S)^2;                                     % Dong et al. I_mc, simplified, BETTER
+            I_mc = (s2/Yc)^2 + (t12/S)^2;                                     % Dong et al. I_mc, simplified, BETTER
 
             
             Igate = [g1*I_ft; (1-g1)*I_fc; g2*I_mt; (1-g2)*I_mc];
-            H_e = H_e + Igate * wt * jac;
+            H_e = H_e + Igate * wt * jac / Ae;
 
             %% ---- derivatives of each gated index w.r.t. (s1, s2, t12) ----
             dg1_ds1 = k_gate*g1*(1-g1);
@@ -124,15 +124,15 @@ for e = 1:numele
             % Density
             dsig_dx = q * xdens^(q-1) * sig_unscaled;
             dHdx_gp = Psi' * dsig_dx;              % nmode x 1
-            dHdx_e  = dHdx_e + dHdx_gp * wt * jac;
+            dHdx_e  = dHdx_e + dHdx_gp * wt * jac / Ae;
 
             % Theta
             dH_dth_gp = Psi' * (xdens^q * C0 * dT_eps_dth * (B * Ue));  % nmode x 1
-            dH_dth_e  = dH_dth_e + dH_dth_gp * wt * jac;
+            dH_dth_e  = dH_dth_e + dH_dth_gp * wt * jac / Ae;
 
             % Adjoint RHS contribution
             fadj_gp = B' * T_eps' * C0' * Psi * xdens^q;   % ndof x nmode
-            fadj_e = fadj_e + fadj_gp * wt * jac;
+            fadj_e = fadj_e + fadj_gp * wt * jac / Ae;
         end
     end
 

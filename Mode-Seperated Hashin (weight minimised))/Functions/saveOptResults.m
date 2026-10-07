@@ -16,6 +16,8 @@ if nargin < 21 || isempty(filename)
     filename = sprintf('opt_results_%s.mat', datestr(now, 'yyyymmdd_HHMMSS'));
 end
 
+filepath = 'C:\Users\sfxz32\OneDrive - Durham University\Desktop\TopOpt\Mode-Seperated Hashin (weight minimised))\Results';
+
 results.xphy      = xphy;       % converged design: [density(1:numele); theta(numele+1:end)]
 results.U         = U;          % converged global displacement field
 results.numele    = numele;
@@ -37,6 +39,7 @@ results.vonMises  = vonMises;   % converged per-element von Mises stress
 results.iter      = iter;       % iterations taken to converge
 results.M         = M;          % final greyness measure
 
-save(filename, '-struct', 'results');
+fullFilePath = fullfile(filepath,filename);
+save(fullFilePath, '-struct', 'results');
 fprintf('Saved optimisation results to %s\n', filename);
 end
