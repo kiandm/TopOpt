@@ -19,7 +19,7 @@ function [TW, g_tw, vonMises] = checkTsaiWu(filename, doPlot)
 %             same convention as g_hs elsewhere in this project
 %   vonMises  numele x 1, per-element von Mises stress, for cross-reference
 % 
-% Execute this file with "[TW, g_tw, vonMises] = checkTsaiWu(filename);" in
+% Execute this file with "[TW, g_tw, vonMises] = checkTsaiWu(mfilename);" in
 % the command window.
 addpath('Results\')
 if nargin < 2

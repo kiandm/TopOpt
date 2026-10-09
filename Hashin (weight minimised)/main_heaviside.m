@@ -5,12 +5,14 @@
 tic
 clear; clc; 
 % close all;
-% warning off
+warning off
 addpath('Functions\')
 %% Parameters
-volfrac = 0.40; penal = 3.0; rmin_phys = 4; 
-maxiter = 1000; theta_init = pi/2;
+volfrac = 0.50; penal = 3.0; rmin_phys = 5; 
+maxiter = 3000; theta_init = pi/2;
 beta = 1; beta_max = 32; eta = 0.5;
+c_max = 200;
+crow = 25;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
 matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction
@@ -25,12 +27,12 @@ strength.Yc=118;                                 % Transverse direction compress
 strength.S=72;                                   % Shear term (MPa)
 %%
 [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_Lbrac60(rmin_phys);
-% [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin_phys);
-% [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_cantilever(rmin_phys);
-Ht = H';   Hs = full(sum(H,2));             % Hs = sum(H,2);
+Hs = full(sum(H,2));      % full vector (sum of a sparse matrix is sparse)
+Ht = H';                  % transpose: used for every ADJOINT (sensitivity) filter below
+fscale = 0.02*numele;     % Objective scale (gradient per element)
 U = zeros(2*numnode,1);
 gs=gauss_domain(coords,numele,conn,2);
-gs1=gauss_domain(coords,numele,conn,1);     %1 gauss point at the centre
+gs1=gauss_domain(coords,numele,conn,1);    %1 gauss point at the centre
 % Pre-computing shape function derivatives (ONLY VALID FOR STRUCTURED MESH)
 dphix_ref = zeros(4,4); dphiy_ref = zeros(4,4); % (node, gauss-point)
 for gp_idx = 1:4
@@ -47,21 +49,18 @@ for i=1:numele
     end
 end
 % Initialise design variables and combine
-x = volfrac * ones(numele,1);                % Density variables
-% x = 1 * ones(numele,1);                      % Density variables
+x = 1 * ones(numele,1);                % Density variables
 theta = theta_init * ones(numele,1);         % Fiber direction variables
 xval = [x; theta];                           % Combine design variables
 % Bounds for densities and fiber directions
 xmin_x = 1e-4 * ones(numele,1);              % Lower bound for densities
 xmax_x = 1 * ones(numele,1);                 % Upper bound for densities
-% xmin_theta = -(pi/2) * ones(numele,1);       % Lower bound for fiber directions
-% xmax_theta =  (pi/2) * ones(numele,1);       % Upper bound for fiber directions
-xmin_theta = 0 * ones(numele,1);             % Lower bound for fiber directions
-xmax_theta =  pi * ones(numele,1);           % Upper bound for fiber directions
+xmin_theta = (0) * ones(numele,1);           % Lower bound for fiber directions
+xmax_theta =  (pi) * ones(numele,1);         % Upper bound for fiber directions
 %%
 % INITIALIZE MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
-m     = 5;                          % The number of general constraints.
+m     = 2;                          % The number of general constraints.
 n     = numel(xval);                % The number of design variables x_j.
 xmin  = [xmin_x; xmin_theta];       % Column vector with the lower bounds for the variables x_j.
 xmax  = [xmax_x; xmax_theta];       % Column vector with the upper bounds for the variables x_j.
@@ -85,57 +84,56 @@ halfL = barLength / 2;      % plot from middle of element
 x_tilde = (H*xval(1:numele))./Hs;
 [x_proj, ~] = heavisideProjection(x_tilde, beta, eta);
 xphy(1:numele) = x_proj;
-p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-xphy(numele+1:end) = 0.5*atan2((H*sin(2*xval(numele+1:end)))./Hs,...
-                               (H*cos(2*xval(numele+1:end)))./Hs);
+% p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+% xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+xphy(numele+1:end) = filterTheta(xval(numele+1:end), H, Hs);
 %% Optimisation loop
-iterationHistory = zeros(maxiter, 8);
-change = 1; iter = 0; M = 100;
+iterationHistory = zeros(maxiter, 5);
 itb = inf;
-converged = (beta >= 25) && (change <= 1e-3) && (M <= 5); % beta_max
-while ~converged && iter < maxiter    
+change = 1; iter = 0; M = 100;
+converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
+while ~converged && iter < maxiter 
+% iterationHistory = zeros(maxiter, 5);
+% change = 1; iter = 0;
+% while change > 1e-3 && iter < maxiter
     iter = iter + 1;
     % Heaviside projection
     x_tilde = (H*xval(1:numele))./Hs;
     [x_proj,dxphy] = heavisideProjection(x_tilde,beta,eta);
     xphy(1:numele) = x_proj;
-    xphy(numele+1:end) = 0.5*atan2((H*sin(2*xval(numele+1:end)))./Hs,...
-                                   (H*cos(2*xval(numele+1:end)))./Hs);
+    xphy(numele+1:end) = filterTheta(xval(numele+1:end), H, Hs);
     % FE Analysis
-    [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn,...
-                                  freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
+    [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
     % Hashin constraint
-    [g_hs, dgh_dx_raw, dgh_dtheta, FailIdx, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn,...
-                                                               matprop, strength, freedofs, dphix_ref, dphiy_ref);    % Objective function and sensitivities
-    % Objective function
+    [g_hs, dgh_dx_raw, dgh_dtheta, TW, ~, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref); % ADDED DPHI
+    % Objective function and sensitivities
     [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop, dphix_ref, dphiy_ref); % ADDED DPHI 
     % Volume constraint and sensitivities
-    [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve); 
+    [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, 1, numele, ve); 
 %%
-    % filtering of sensitivities: each adjoint filter is applied with Ht = H' (NOT H)
+        % filtering of sensitivities: each adjoint filter is applied with Ht = H' (NOT H)
     th      = xval(numele+1:end);
     q1      = (H*cos(2*th))./Hs;   q2 = (H*sin(2*th))./Hs;   R2 = max(q1.^2 + q2.^2, 1e-6);
     dth_dq1 = -0.5*q2./R2;         dth_dq2 = 0.5*q1./R2;     % d(theta_tilde)/d(q1,q2),  theta_tilde = 0.5*atan2(q2,q1)
     sc      = -2*sin(2*th);        cc2     = 2*cos(2*th);    % d(q1,q2)/d(theta)
     % dv_dtheta is zero anyway since volume doesn't depend on fibre direction
-    dc_theta   = sc.*(Ht*((dc_theta  .*dth_dq1)./Hs)) +...
-                 cc2.*(Ht*((dc_theta  .*dth_dq2)./Hs));
-    dgh_dtheta = sc.*(Ht*((dgh_dtheta.*dth_dq1)./Hs)) +...
-                 cc2.*(Ht*((dgh_dtheta.*dth_dq2)./Hs));
+    dc_theta   = sc.*(Ht*((dc_theta  .*dth_dq1)./Hs)) + cc2.*(Ht*((dc_theta  .*dth_dq2)./Hs));
+    dgh_dtheta = sc.*(Ht*((dgh_dtheta.*dth_dq1)./Hs)) + cc2.*(Ht*((dgh_dtheta.*dth_dq2)./Hs));
     % sensitivities in x: chain rule through the Heaviside projection, then the adjoint of the density filter
     dc_dx  = Ht*((dc_dx_raw .*dxphy)./Hs);
     dv_dx  = Ht*((dv_dx_raw .*dxphy)./Hs);
     dgh_dx = Ht*((dgh_dx_raw.*dxphy)./Hs);
-
     % Combine sensitivities
-    df0dx = [dc_dx; dc_theta];                     % Combined objective function sensitivities
-    dfdx = [ dv_dx(:).',   dv_theta(:).'  ;
-               dgh_dx.',    dgh_dtheta.' ];    % Combined constraint sensitivities 
+    g_c = c-c_max - 1;                             % Compliance constraints c <= c_max
+    df0dx = fscale*[dv_dx; dv_theta];                     % Combined objective function sensitivities (dv_theta = 0)
+    dfdx = [ crow*dc_dx(:).'/c_max,      crow*dc_theta(:).'/c_max  ;
+            dgh_dx(:).',     dgh_dtheta(:).' ];    % Combined constraint sensitivities 
  %%
     % Initial values for MMA
-    f0val = c;             % Initial objective function value
-    fval = [v; g_hs];      % Initial volume constraint value 
-    fval(1) = 100*fval(1);   dfdx(1,:) = 100*dfdx(1,:);   % volume row scaled for MMA (dv/dx per element ~ O(raa0))
+    % f0val = c;             % Initial objective function value
+    % fval = [v; g_hs];      % Initial volume constraint value 
+    f0val = fscale*(v+1);          % objective: volume fraction (scaled)
+    fval  = [crow*g_c; g_hs];      % constraints: compliance row, then the collapsed Hashin row
     % MMA update
     [xmma, ~, ~, ~, ~, ~, ~, ~, ~, low1, upp1] = mmasub(m, n, iter, xval, xmin,...
         xmax, xold1, xold2, f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d);
@@ -143,18 +141,17 @@ while ~converged && iter < maxiter
     xold2 = xold1; xold1 = xval; % Update old values
     xval = xmma;                 % current values of the design variables
     % %filter theta with Cartesian components
-    %p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
-    %xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
+    % p1 = cos(xval(numele+1:end)); p2 = sin(xval(numele+1:end));
+    % xphy(numele+1:end) = atan2((H*p2)./Hs, (H*p1)./Hs);
     % Print results
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
     change = max(change_x, change_t);
-    fprintf('It %d: Obj = %f, V = %f, M = %f, g_ft = %f, g_fc = %f, g_mt = %f, g_mc = %f, Change = %f, Change in x = %f, Change in theta = %f\n', ...
-        iter, c, v, M, g_hs(1), g_hs(2), g_hs(3), g_hs(4), change, change_x, change_t);
-    iterationHistory(iter, :) = [iter, c, v, change, g_hs(1), g_hs(2), g_hs(3), g_hs(4)];
+    fprintf('It %d: Obj = %f, V = %f, g_hs = %f, Change = %f, Change in x = %f, Change in theta = %f\n', iter, c, v+1, g_hs, change, change_x, change_t);
+    iterationHistory(iter, :) = [iter, c, v+1, change, g_hs];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 0
-        figure(5); clf;
+        figure(9); clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
@@ -168,22 +165,21 @@ while ~converged && iter < maxiter
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        title(sprintf('Iter: %d | Obj: %.2f | max(g): %.2f', iter, c, max(g_hs)));
+        title(sprintf('Iter: %d | V: %.3f | Obj: %.2f | Stress: %.2f', iter, v+1, c, g_hs));
         drawnow;
     end
     % Beta continuation block
-    if mod(iter, 50) == 0 && beta < beta_max
+    if mod(iter, 25) == 0 && beta < beta_max
         beta = min(beta*1.5, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
     M = 100 * sum(4*xphy(1:numele).*(1-xphy(1:numele))) / numele;
     % converged = (beta >= beta_max) && (change <= 1e-3) && (M <= 5);
-        if beta >= beta_max && ~isfinite(itb), itb = iter; end        % iteration at which beta reached beta_max
+        if beta >= beta_max && ~isfinite(itb), itb = iter; end
     win        = 20;
     stationary = (iter - itb >= win) && ...
-                 (max(iterationHistory(iter-win+1:iter,2)) -...
-                  min(iterationHistory(iter-win+1:iter,2))) / iterationHistory(iter,2) < 1e-3;
-    feasible   = max([v; g_hs]) <= 1e-2;
+                 (max(iterationHistory(iter-win+1:iter,3)) - min(iterationHistory(iter-win+1:iter,3))) / iterationHistory(iter,3) < 1e-3;   % column 3 = volume fraction
+    feasible   = max([g_c; g_hs]) <= 1e-2;
     converged  = (beta >= beta_max) && (M <= 5) && stationary && feasible;
 end
 warning on
@@ -194,12 +190,11 @@ M = 100 * sum(4 * x .* (1 - x))/numele;
 disp(M) % percentage of average greyness (i.e. design is M2% grey )
 % Plot orientation
 theta_rad = xphy(numele+1:end);
-%theta_deg = mod(rad2deg(theta_rad), 180); % Extract physical angles and convert from radians to degrees [0, 180]
-theta_deg = mod(rad2deg(theta_rad)+90, 180)-90; % Extract physical angles and convert from radians to degrees [0, 180]
+theta_deg = mod(rad2deg(theta_rad), 180); % Extract physical angles and convert from radians to degrees [0, 180]
 x_dens = xphy(1:numele);
 theta_plot = theta_deg;
 theta_plot(x_dens <= 0.5) = NaN; % Hide void elements
-figure(6); clf;
+figure(10); clf;
 patch('Faces', conn', ...
       'Vertices', coords', ...
       'FaceVertexCData', theta_plot, ...
@@ -209,8 +204,7 @@ axis equal tight off;
 colormap(hsv);             % 'hsv' or 'jet' work well for periodic angles
 c = colorbar;
 c.Label.String = 'Fiber Angle (degrees)';
-% clim([0 180]);             % Fixed scale from 0° to 180°
-clim([-90 90]);             % Fixed scale from 0° to 180°
+clim([0 180]);             % Fixed scale from 0° to 180°
 set(gcf, 'Color', 'w');
 title('Fiber Orientation Field'); % Format colormap, limits, and colorbar
 hold on;
@@ -225,44 +219,38 @@ y_lines = [y_cen(ind) - halfL*sin(theta_rad(ind)), ... % Fixed: y_cen instead of
            nan(length(ind),1)]';
 line(x_lines(:), y_lines(:), 'Color', [0 0 0 0.5], 'LineWidth', 0.8); % Overlay fiber direction vector lines
 % Hashin failure plot
-figure(7); clf;
-modeNames = {'Fibre Tension', 'Fibre Compression', 'Matrix Tension', 'Matrix Compression'};
+figure(11); clf;
 mask = xphy(1:numele) < 0.3;
-for k = 1:4
-    subplot(2,2,k);
-    field_plot2 = FailIdx(:,k);
-    field_plot2(mask) = NaN;
-    patch('Faces', conn', ...
-          'Vertices', coords', ...
-          'FaceVertexCData', field_plot2, ...
-          'FaceColor', 'flat', ...
-          'EdgeColor', 'none');
-    axis equal off;
-    colorbar;
-    clim([0 1.2]);   % 1 = failure limit
-    title(sprintf('%s (iter %d)', modeNames{k}, iter));
-end
-set(gcf, 'Color', 'white');
+field_plot2 = TW;
+field_plot2(mask) = NaN;
+patch('Faces', conn', ...
+      'Vertices', coords', ...
+      'FaceVertexCData', field_plot2, ...
+      'FaceColor', 'flat', ...
+      'EdgeColor', 'none');
+set(gcf, 'Color', 'white')
+axis equal off;
+colorbar;
+clim([0 1.2]);   % 1 = failure limit
+title(sprintf('Hashin Index (iteration %d)', iter));
 drawnow;
 % plot iteration convergence history
-figure(8); clf;
+figure(12); clf;
 yyaxis left
-plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
+plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 3), '-o');
 xlabel('Iteration');
-ylabel('Objective Function (Compliance)');
+ylabel('Objective Function (Volume Fraction)');
 yyaxis right
-plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'DisplayName', 'g_{ft}'); hold on;
-plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 6), '-s', 'DisplayName', 'g_{fc}');
-plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 7), '-^', 'DisplayName', 'g_{mt}');
-plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 8), '-d', 'DisplayName', 'g_{mc}');
-ylabel('Hashin mode constraints, g');
-legend('Location', 'best');
+plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'Color', 'r');
+ylabel('Hashin Index, g_{hs}');
+ax = gca;
+ax.YAxis(2).Color = 'r';
 title('Convergence History');
 grid on;
 
 % Save converged results for later checking against other failure criteria
 % (see checkTsaiWu.m)
 saveOptResults(xphy, U, numele, numnode, gs, edofMat, coords, conn, matprop, strength, ...
-    penal, dphix_ref, dphiy_ref, freedofs, F, FailIdx, g_hs, vonMises, iter, M);
+    penal, dphix_ref, dphiy_ref, freedofs, F, TW, g_hs, vonMises, iter, M);
 
 toc

@@ -8,9 +8,11 @@ close all;
 % warning off
 addpath('Functions\')
 %% Parameters
-volfrac = 0.40; penal = 3.0; rmin_phys = 4; 
-maxiter = 1000; theta_init = pi/2;
-beta = 1; beta_max = 32; eta = 0.5;
+penal = 3.0; rmin_phys = 4; % volfrac = 0.40; 
+maxiter = 2000; theta_init = pi/2;
+beta = 1; beta_max = 64; eta = 0.5;
+c_max = 200.0;      % Compliance limit F'*U
+crow = 25;          % Scale of the compliance row for MMA   
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
 matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction
@@ -28,6 +30,7 @@ strength.S=72;                                   % Shear term (MPa)
 % [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_mbb(rmin_phys);
 % [coords, conn, edofMat, numnode, numele, freedofs, F, H]= problem_setup_cantilever(rmin_phys);
 Ht = H';   Hs = full(sum(H,2));             % Hs = sum(H,2);
+fscale = 0.02*numele; % objective scale: gradient per element around 0.02
 U = zeros(2*numnode,1);
 gs=gauss_domain(coords,numele,conn,2);
 gs1=gauss_domain(coords,numele,conn,1);     %1 gauss point at the centre
@@ -47,14 +50,14 @@ for i=1:numele
     end
 end
 % Initialise design variables and combine
-x = volfrac * ones(numele,1);                % Density variables
-% x = 1 * ones(numele,1);                % Density variables
+% x = volfrac * ones(numele,1);                % Density variables
+x = 1 * ones(numele,1);                      % Density variables
 theta = theta_init * ones(numele,1);         % Fiber direction variables
 xval = [x; theta];                           % Combine design variables
 % Bounds for densities and fiber directions
 xmin_x = 1e-4 * ones(numele,1);              % Lower bound for densities
 xmax_x = 1 * ones(numele,1);                 % Upper bound for densities
-% xmin_theta = -(pi/2) * ones(numele,1);           % Lower bound for fiber directions
+% xmin_theta = -(pi/2) * ones(numele,1);         % Lower bound for fiber directions
 % xmax_theta =  (pi/2) * ones(numele,1);         % Upper bound for fiber directions
 xmin_theta = 0 * ones(numele,1);           % Lower bound for fiber directions
 xmax_theta =  pi * ones(numele,1);         % Upper bound for fiber directions
@@ -106,7 +109,7 @@ while ~converged && iter < maxiter
     % Objectvie function
     [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop, dphix_ref, dphiy_ref); % ADDED DPHI 
     % Volume constraint and sensitivities
-    [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, volfrac, numele, ve); 
+    [v, dv_dx_raw, dv_theta] = volume_constraint(xphy, 1, numele, ve); 
 %%
     % filtering of sensitivities: each adjoint filter is applied with Ht = H' (NOT H)
     th      = xval(numele+1:end);
@@ -122,14 +125,15 @@ while ~converged && iter < maxiter
     dgh_dx = Ht*((dgh_dx_raw.*dxphy)./Hs);
 
     % Combine sensitivities
-    df0dx = [dc_dx; dc_theta];                     % Combined objective function sensitivities
-    dfdx = [ dv_dx(:).',   dv_theta(:).'  ;
-               dgh_dx.',     dgh_dtheta.'   ];    % Combined constraint sensitivities 
+    g_c = c/c_max - 1;
+    df0dx = fscale*[dv_dx; dv_theta];                                % Combined objective function sensitivities
+    dfdx = [ crow*dc_dx(:).'/c_max,   crow*dc_theta(:).'/c_max  ;
+                          dgh_dx.',                dgh_dtheta.'];    % Combined constraint sensitivities 
  %%
     % Initial values for MMA
-    f0val = c;             % Initial objective function value
-    fval = [v; g_hs];      % Initial volume constraint value 
-    fval(1) = 100*fval(1);   dfdx(1,:) = 100*dfdx(1,:);   % volume row scaled for MMA (dv/dx per element ~ O(raa0))
+    f0val = fscale*(v+1);             % Initial objective function value (scaled)
+    fval = [crow*g_c; g_hs];          % constraints: compliance then 4 rows of Hashin
+    %fval(1) = 100*fval(1);   dfdx(1,:) = 100*dfdx(1,:);   % volume row scaled for MMA (dv/dx per element ~ O(raa0))
     % MMA update
     [xmma, ~, ~, ~, ~, ~, ~, ~, ~, low1, upp1] = mmasub(m, n, iter, xval, xmin,...
         xmax, xold1, xold2, f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d);
@@ -143,9 +147,9 @@ while ~converged && iter < maxiter
     change_x = max(abs(xval(1:numele) - xold1(1:numele)));
     change_t = max(abs(xval(numele+1:end) - xold1(numele+1:end))) / pi;
     change = max(change_x, change_t);
-    fprintf('It %d: Obj = %f, V = %f, M = %f, g_ft = %f, g_fc = %f, g_mt = %f, g_mc = %f, Change = %f, Change in x = %f, Change in theta = %f\n', ...
-        iter, c, v, M, g_hs(1), g_hs(2), g_hs(3), g_hs(4), change, change_x, change_t);
-    iterationHistory(iter, :) = [iter, c, v, change, g_hs(1), g_hs(2), g_hs(3), g_hs(4)];
+    fprintf('It %d: C = %f, obj(V) = %f, M = %f, g_ft = %f, g_fc = %f, g_mt = %f, g_mc = %f, Change = %f, Change in x = %f, Change in theta = %f\n', ...
+        iter, c, v+1, M, g_hs(1), g_hs(2), g_hs(3), g_hs(4), change, change_x, change_t);
+    iterationHistory(iter, :) = [iter, c, v+1, change, g_hs(1), g_hs(2), g_hs(3), g_hs(4)];
     % Plot design (x and theta)
     if mod(iter, 5) == 0 || iter == 0
         figure(5); clf;
@@ -162,7 +166,7 @@ while ~converged && iter < maxiter
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        title(sprintf('Iter: %d | Obj: %.2f | max(g): %.2f', iter, c, max(g_hs)));
+        title(sprintf('Iter: %d | Obj: %.2f | c: %.1f | max(g): %.2f', iter, v+1, c, max(g_hs)));
         drawnow;
     end
     % Beta continuation block
@@ -175,8 +179,8 @@ while ~converged && iter < maxiter
         if beta >= beta_max && ~isfinite(itb), itb = iter; end        % iteration at which beta reached beta_max
     win        = 20;
     stationary = (iter - itb >= win) && ...
-                 (max(iterationHistory(iter-win+1:iter,2)) - min(iterationHistory(iter-win+1:iter,2))) / iterationHistory(iter,2) < 1e-3;
-    feasible   = max([v; g_hs]) <= 1e-2;
+                 (max(iterationHistory(iter-win+1:iter,3)) - min(iterationHistory(iter-win+1:iter,3))) / iterationHistory(iter,3) < 1e-3;
+    feasible   = max([g_c; g_hs]) <= 1e-2;
     converged  = (beta >= beta_max) && (M <= 5) && stationary && feasible;
 end
 warning on
@@ -240,9 +244,9 @@ drawnow;
 % plot iteration convergence history
 figure(8); clf;
 yyaxis left
-plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 2), '-o');
+plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 3), '-o');
 xlabel('Iteration');
-ylabel('Objective Function (Compliance)');
+ylabel('Objective Function (Volume Fraction)');
 yyaxis right
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 5), '-o', 'DisplayName', 'g_{ft}'); hold on;
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 6), '-s', 'DisplayName', 'g_{fc}');
