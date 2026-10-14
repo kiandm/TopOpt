@@ -64,7 +64,7 @@ if g_h > 0 && g_ft <= 0 && g_mt <= 0
 end
 
 % ---- Sweep: how far apart are the two formulations across criticality? ----
-fracs = 0.5:0.01:1.0;
+fracs = 0.5:0.001:1.0;
 g_sep_sweep = zeros(size(fracs));
 g_h_sweep   = zeros(size(fracs));
 for k = 1:numel(fracs)
@@ -81,7 +81,18 @@ for k = 1:numel(fracs)
     HcB_k = collapsedIndex(sB_k, strength, delta_f, delta_m, eps_max);
     g_h_sweep(k) = (HcA_k^(2*p) + HcB_k^(2*p))^(1/p) - 1;
 end
-
+% ---- Where each curve crosses g = 0 (linear interpolation between sweep points) ----
+x_sep = zeroCross(fracs*100, g_sep_sweep);
+x_col = zeroCross(fracs*100, g_h_sweep);
+fprintf('---- g = 0 crossings (stress as %% of each element''s own critical allowable) ----\n');
+fprintf('  mode-separated (worst of g_ft, g_mt): x = %.2f %%\n', x_sep);
+fprintf('  mode-collapsed (g_h, squared index):  x = %.2f %%\n', x_col);
+if isnan(x_sep) || isnan(x_col)
+    fprintf('  No crossing inside the swept range (%.0f-%.0f %%).\n\n', fracs(1)*100, fracs(end)*100);
+else
+    fprintf('  Separated approach: +%.2f percentage points, i.e. %.2f %% improvement over collapsed\n', x_sep - x_col, 100*(x_sep - x_col)/x_col);
+    fprintf('  (stress scales linearly with load, so this is also the extra load the design can carry)\n\n');
+end
 figure;
 plot(fracs*100, g_sep_sweep, 'b-', 'LineWidth', 1.5); hold on;
 plot(fracs*100, g_h_sweep, 'g-.', 'LineWidth', 1.5);
@@ -91,6 +102,11 @@ ylabel('Constraint value g (<=0 is feasible)');
 legend('worst of g_{ft}, g_{mt} (separated)', 'g_h (collapsed, squared index)', 'feasibility boundary', 'Location', 'best');
 title('Constraint value against percentage of critical stress, showing difference in feasibility');
 grid on;
+
+% Printing when each line crosses y=0, and the percentage change between
+% this crossing for g_sep and g_h
+
+
 end
 
 function [I_ft_gated, I_mt_gated] = separatedFtMt(sig, strength, k_gate)
@@ -121,6 +137,16 @@ elseif c < -delta
     h = b;
 else
     h = 0.75*(a-b)*(c/delta - c^3/(3*delta^3)) + (a+b)/2;
+end
+end
+
+function x0 = zeroCross(x, y)
+% first upward crossing of y through 0, linearly interpolated; NaN if none
+i = find(y(1:end-1) <= 0 & y(2:end) > 0, 1);
+if isempty(i)
+    x0 = NaN;
+else
+    x0 = x(i) - y(i)*(x(i+1) - x(i))/(y(i+1) - y(i));
 end
 end
 

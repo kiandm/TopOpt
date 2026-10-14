@@ -124,7 +124,7 @@ while ~converged && iter < maxiter
     dv_dx  = Ht*((dv_dx_raw .*dxphy)./Hs);
     dgh_dx = Ht*((dgh_dx_raw.*dxphy)./Hs);
     % Combine sensitivities
-    g_c = c-c_max - 1;                             % Compliance constraints c <= c_max
+    g_c = c/c_max - 1;                             % Compliance constraints c <= c_max
     df0dx = fscale*[dv_dx; dv_theta];                     % Combined objective function sensitivities (dv_theta = 0)
     dfdx = [ crow*dc_dx(:).'/c_max,      crow*dc_theta(:).'/c_max  ;
             dgh_dx(:).',     dgh_dtheta(:).' ];    % Combined constraint sensitivities 
