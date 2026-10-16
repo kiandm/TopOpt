@@ -85,7 +85,7 @@ for e = 1:numele
             diff_fm = FI_f - FI_m;
             root_fm = sqrt(diff_fm^2 + eps_max);
             H_gp = 0.5*((FI_f+FI_m) + root_fm - sqrt(eps_max));   % Eq. 16 (corrected)          
-            H_e = H_e + H_gp * wt * jac;
+            H_e = H_e + H_gp * wt * jac / Ae;
             
             %% ---- derivatives of H_gp w.r.t. (s1, s2, t12) ----
             %dHf_ds1 = dHeavisideBlend(Xt, Xc, s1, delta_f);

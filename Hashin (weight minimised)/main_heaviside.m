@@ -10,9 +10,9 @@ addpath('Functions\')
 %% Parameters
 volfrac = 0.50; penal = 3.0; rmin_phys = 5; 
 maxiter = 3000; theta_init = pi/2;
-beta = 1; beta_max = 32; eta = 0.5;
-c_max = 200;
-crow = 25;
+beta = 1; beta_max = 64; eta = 0.5;
+c_max = 800;
+crow = 45;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
 matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction
@@ -165,11 +165,11 @@ while ~converged && iter < maxiter
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        title(sprintf('Iter: %d | V: %.3f | Obj: %.2f | Stress: %.2f', iter, v+1, c, g_hs));
+        title(sprintf('Iter: %d | Obj(V): %.3f | c: %.2f | Stress: %.2f', iter, v+1, c, g_hs));
         drawnow;
     end
     % Beta continuation block
-    if mod(iter, 25) == 0 && beta < beta_max
+    if mod(iter, 50) == 0 && beta < beta_max
         beta = min(beta*1.5, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end

@@ -20,6 +20,7 @@ S  = strength.S;   % NOTE: in-plane shear strength reused as transverse (S23) al
                     % for the matrix-compression term - standard simplification, flag in methods.
 
 k_gate = 50;   % sigmoid sharpness for tension/compression gating within a mode (tune)
+eps_sq = 1e-12; % keeps sqrt(I) differentiable at I = 0
 q      = 0.8;  % stress interpolation exponent
 
 % Material stiffness (material coordinates)
@@ -101,7 +102,9 @@ for e = 1:numele
 
             
             Igate = [g1*I_ft; (1-g1)*I_fc; g2*I_mt; (1-g2)*I_mc];
-            H_e = H_e + Igate * wt * jac / Ae;
+            % H_e = H_e + Igate * wt * jac / Ae; % Old squared indices
+            FIgate = sqrt(Igate + eps_sq);   % stress-ratio index of each gated mode (square root of the quadratic index)
+            H_e = H_e + FIgate * wt * jac / Ae;
 
             %% ---- derivatives of each gated index w.r.t. (s1, s2, t12) ----
             dg1_ds1 = k_gate*g1*(1-g1);
@@ -119,6 +122,7 @@ for e = 1:numele
             Psi(1,2) = -dg1_ds1*I_fc + (1-g1)*dIfc_ds1;    Psi(3,2) = (1-g1)*dIfc_dt12;
             Psi(2,3) = dg2_ds2*I_mt + g2*dImt_ds2;         Psi(3,3) = g2*dImt_dt12;
             Psi(2,4) = -dg2_ds2*I_mc + (1-g2)*dImc_ds2;    Psi(3,4) = (1-g2)*dImc_dt12;
+            Psi = Psi ./ (2*FIgate.');       % chain rule: d sqrt(I) = dI / (2 sqrt(I))
 
             %% sensitivities
             % Density

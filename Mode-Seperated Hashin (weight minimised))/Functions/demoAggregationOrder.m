@@ -93,6 +93,32 @@ else
     fprintf('  Separated approach: +%.2f percentage points, i.e. %.2f %% improvement over collapsed\n', x_sep - x_col, 100*(x_sep - x_col)/x_col);
     fprintf('  (stress scales linearly with load, so this is also the extra load the design can carry)\n\n');
 end
+
+% ---- Does the gap survive when both formulations use the SAME exponent on the stress-ratio index? ----
+%   mode-separated  ||I||_{P/2} <= 1  with I = FI^2   (Hashin.m's p = 8 on I is P = 16)
+%   mode-collapsed  ||Hc||_P    <= 1  with Hc linear  (Dong et al. as published: p = 8 is P = 8)
+Ps = [4 8 16 32 64];
+x_sep_P = zeros(size(Ps));   x_col_P = zeros(size(Ps));
+for kk = 1:numel(Ps)
+    x_sep_P(kk) = crossingPct('separated', Ps(kk), strength, k_gate, delta_f, delta_m, eps_max);
+    x_col_P(kk) = crossingPct('collapsed', Ps(kk), strength, k_gate, delta_f, delta_m, eps_max);
+end
+fprintf('---- g = 0 crossing (stress as %% of allowable) against exponent P on the stress-ratio index ----\n');
+fprintf('     P    separated   collapsed   gap [pts]   improvement [%%]\n');
+for kk = 1:numel(Ps)
+    fprintf('  %4d    %8.2f    %8.2f    %7.2f    %8.2f\n', Ps(kk), x_sep_P(kk), x_col_P(kk), ...
+            x_sep_P(kk)-x_col_P(kk), 100*(x_sep_P(kk)-x_col_P(kk))/x_col_P(kk));
+end
+fprintf(['  Hashin.m with p = 8 on I corresponds to P = 16; Dong''s linear index with p = 8 corresponds to P = 8.\n' ...
+         '  As published, the comparison is therefore the P = 16 separated row against the P = 8 collapsed row.\n\n']);
+figure;
+semilogx(Ps, x_sep_P, 'b-o', 'LineWidth', 1.5); hold on;
+semilogx(Ps, x_col_P, 'g-s', 'LineWidth', 1.5);
+yline(100, 'k:');
+xlabel('Exponent P applied to the stress-ratio index'); ylabel('Stress at which g = 0 [% of allowable]');
+legend('separated', 'collapsed', '100 %', 'Location', 'best'); grid on;
+title('Feasibility threshold against p-norm exponent');
+
 figure;
 plot(fracs*100, g_sep_sweep, 'b-', 'LineWidth', 1.5); hold on;
 plot(fracs*100, g_h_sweep, 'g-.', 'LineWidth', 1.5);
@@ -147,6 +173,28 @@ if isempty(i)
     x0 = NaN;
 else
     x0 = x(i) - y(i)*(x(i+1) - x(i))/(y(i+1) - y(i));
+end
+end
+
+
+function x = crossingPct(formulation, P, strength, k_gate, delta_f, delta_m, eps_max)
+% stress (percent of each element's own critical allowable) at which the two-element constraint reaches g = 0
+x = 100 * fzero(@(fr) gAtFrac(fr, formulation, P, strength, k_gate, delta_f, delta_m, eps_max), [0.3 1.2]);
+end
+
+function g = gAtFrac(fr, formulation, P, strength, k_gate, delta_f, delta_m, eps_max)
+sA = [fr*strength.Xt, 2.0, 5.0];     % element A: fibre-tension critical
+sB = [10.0, fr*strength.Yt, 5.0];    % element B: matrix-tension critical
+switch formulation
+    case 'separated'                 % ||I||_{P/2} per mode, I = FI^2, binding mode
+        [IA_f, IA_m] = separatedFtMt(sA, strength, k_gate);
+        [IB_f, IB_m] = separatedFtMt(sB, strength, k_gate);
+        q = P/2;
+        g = max((IA_f^q + IB_f^q)^(1/q), (IA_m^q + IB_m^q)^(1/q)) - 1;
+    case 'collapsed'                 % ||Hc||_P with the linear (un-squared) index
+        HA = collapsedIndex(sA, strength, delta_f, delta_m, eps_max);
+        HB = collapsedIndex(sB, strength, delta_f, delta_m, eps_max);
+        g = (HA^P + HB^P)^(1/P) - 1;
 end
 end
 
