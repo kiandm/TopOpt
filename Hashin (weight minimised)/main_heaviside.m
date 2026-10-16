@@ -9,7 +9,7 @@ warning off
 addpath('Functions\')
 %% Parameters
 volfrac = 0.50; penal = 3.0; rmin_phys = 5; 
-maxiter = 3000; theta_init = pi/2;
+maxiter = 1000; theta_init = pi/2;
 beta = 1; beta_max = 64; eta = 0.5;
 c_max = 800;
 crow = 45;
@@ -165,7 +165,7 @@ while ~converged && iter < maxiter
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        title(sprintf('Iter: %d | Obj(V): %.3f | c: %.2f | Stress: %.2f', iter, v+1, c, g_hs));
+        title(sprintf('Mode-Collapsed Hashin \n Iter: %d | Obj(V): %.2f | c: %.1f | max(g): %.2f', iter, v+1, c, max(g_hs)));
         drawnow;
     end
     % Beta continuation block

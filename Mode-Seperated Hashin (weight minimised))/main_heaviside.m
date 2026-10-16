@@ -9,10 +9,10 @@ clear; clc;
 addpath('Functions\')
 %% Parameters
 penal = 3.0; rmin_phys = 4; % volfrac = 0.40; 
-maxiter = 2000; theta_init = pi/2;
+maxiter = 1000; theta_init = pi/2;
 beta = 1; beta_max = 64; eta = 0.5;
-c_max = 800;      % Compliance limit F'*U
-crow = 45;          % Scale of the compliance row for MMA   
+c_max = 1941.74;      % Compliance limit F'*U
+crow = 230;          % Scale of the compliance row for MMA   
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
 matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction
@@ -166,7 +166,7 @@ while ~converged && iter < maxiter
                   y_cen(ind) + halfL*sin(theta_curr(ind)), ...
                   nan(length(ind),1)]';
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
-        title(sprintf('Iter: %d | Obj(V): %.2f | c: %.1f | max(g): %.2f', iter, v+1, c, max(g_hs)));
+        title(sprintf('Mode-Separated Hashin \n Iter: %d | Obj(V): %.2f | c: %.1f | max(g): %.2f', iter, v+1, c, max(g_hs)));
         drawnow;
     end
     % Beta continuation block
