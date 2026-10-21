@@ -1,7 +1,8 @@
 % MMA Optimization for Topology Optimization with Filtering
-% By Zahur Ullah 21/5/2025 and edited to add Hashin stress-constraint by Kian Das 18/8/2026
+% By Zahur Ullah 21/5/2025 and edited to add Mode-separated Hashin failure-constraint by Kian Das 18/8/2026
 % Here it is optimising both density and theta for a fibre-reinforced composite in 2D
-% With Heaviside
+% With Heaviside projection (beta-continuation). Angle filtering is done
+% with Cartesian components
 tic
 clear; clc; 
 % close all;
@@ -10,7 +11,7 @@ addpath('Functions\')
 %% Parameters
 penal = 3.0; rmin_phys = 4; % volfrac = 0.40; 
 maxiter = 1000; theta_init = pi/2;
-beta = 1; beta_max = 64; eta = 0.5;
+beta = 1; beta_max = 32; eta = 0.5;
 c_max = 1941.74;      % Compliance limit F'*U
 crow = 230;          % Scale of the compliance row for MMA   
 %Material properties composites (from Guowei Ma)

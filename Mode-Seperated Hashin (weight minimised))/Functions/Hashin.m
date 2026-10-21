@@ -126,7 +126,8 @@ for e = 1:numele
 
             %% sensitivities
             % Density
-            dsig_dx = q * xdens^(q-1) * sig_unscaled;
+            % dsig_dx = q * xdens^(q-1) * sig_unscaled;
+            dsig_dx = q * max(xdens,1e-12)^(q-1) * sig_unscaled;% Added NaN guard
             dHdx_gp = Psi' * dsig_dx;              % nmode x 1
             dHdx_e  = dHdx_e + dHdx_gp * wt * jac / Ae;
 
@@ -180,7 +181,8 @@ for k = 1:nmode
     quadK  = sum(Lall_k .* KU,  1)';    % numele x 1
     quaddK = sum(Lall_k .* dKU, 1)';    % numele x 1
 
-    dg_dx(:,k)     = fac(:,k).*dHdx(:,k)  - (penal./xdens_all).*quadK;
+    % dg_dx(:,k)     = fac(:,k).*dHdx(:,k)  - (penal./xdens_all).*quadK;
+    dg_dx(:,k) = fac(:,k).*dHdx(:,k) - (penal./max(xdens_all,1e-12)).*quadK; % NaN guard version
     dg_dtheta(:,k) = fac(:,k).*dHdth(:,k) - quaddK;
 end
 end

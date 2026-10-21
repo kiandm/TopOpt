@@ -103,7 +103,8 @@ for e = 1:numele
                     dmax_dFIf * dFIf_dt12 + dmax_dFIm * dFIm_dt12 ];
             %% sensitivities
             % Density
-            dsig_dx = q * xdens^(q-1) * sig_unscaled;
+            % dsig_dx = q * xdens^(q-1) * sig_unscaled;
+            dsig_dx = q * max(xdens,1e-12)^(q-1) * sig_unscaled;% NaN guard
             dHdx_gp = psi' * dsig_dx;
             dHdx_e  = dHdx_e + dHdx_gp * wt * jac / Ae;
             dH_dth_gp = psi' * (xdens^q * C0 * dT_eps_dth * (B * Ue));
@@ -140,7 +141,8 @@ dKU = reshape(pagemtimes(dKE0th, reshape(Uall,ndof,1,numele)), ndof, numele);
 quadK  = sum(Lall .* KU,  1)';   % le' * Ke0    * Ue, one value per element
 quaddK = sum(Lall .* dKU, 1)';   % le' * dKE0th * Ue, one value per element
 xdens_all = xphy(1:numele);
-dgh_dx     = fac .* dHdx  - (penal ./ xdens_all) .* quadK;
+% dgh_dx     = fac .* dHdx  - (penal ./ xdens_all) .* quadK;
+dgh_dx = fac .* dHdx - (penal ./ max(xdens_all,1e-12)) .* quadK;% NaN Guard
 dgh_dtheta = fac .* dHdth - quaddK;
 end
 

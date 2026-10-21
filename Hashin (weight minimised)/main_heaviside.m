@@ -10,9 +10,9 @@ addpath('Functions\')
 %% Parameters
 volfrac = 0.50; penal = 3.0; rmin_phys = 5; 
 maxiter = 1000; theta_init = pi/2;
-beta = 1; beta_max = 64; eta = 0.5;
-c_max = 800;
-crow = 45;
+beta = 1; beta_max = 32; eta = 0.5;
+c_max = 1941.74;      % Compliance limit F'*U
+crow = 230;          % Scale of the compliance row for MMA
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
 matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction
