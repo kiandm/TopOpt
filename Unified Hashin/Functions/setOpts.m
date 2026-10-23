@@ -11,7 +11,7 @@ if nargin < 1 || isempty(user), user = struct(); end
 d.problem     = 'Lbrac60';   % 'Lbrac60' | 'mbb' | 'cantilever'  (Functions/problem_setup_<problem>.m)
 d.ndiv        = 100;         % elements along the 100 mm side (Lbrac60 only)
 d.rmin_phys   = 4;           % density / angle filter radius [mm]
-d.c_max       = 1941.74;     % compliance limit  F'*U
+d.c_max       = 250;     % compliance limit  F'*U
 % ---- material model ------------------------------------------------------------------
 d.penal       = 3.0;         % SIMP penalty
 d.q           = 0.8;         % stress relaxation exponent

@@ -21,7 +21,7 @@ for s = 1:numel(fd)
     stairs(max(e_s, 1e-12), (numel(e_s):-1:1)' / numel(e_s), 'Color', col(s,:), 'LineWidth', 1.4);
 end
 set(gca, 'XScale', 'log', 'YScale', 'log'); grid on
-xline(1e-2, ':'); xline(1e-3, ':');
+xline(1e-2, ':'); xline(1e-3, ':'); xlim([1e-10 1e-1]);
 xlabel('|error| / max|analytic|'); ylabel('fraction of entries with error \geq x');
 legend(cellfun(short, {fd.name}, 'UniformOutput', false), 'Location', 'southwest');
 title('exceedance curve (dotted: 1 % and 0.1 %)');
@@ -43,15 +43,13 @@ lim = [-1 1] * 1.05 * max(scale);
 plot(lim, lim, 'k-'); axis([lim lim]); axis square; grid on
 xlabel('analytic'); ylabel('finite difference'); title('parity');
 
-% 4. signed error map, symmetric-log colour scale (needs the structured mesh: xc, yc on a regular grid)
+% 4. signed error at the checked entries, symmetric-log colour scale; light dots = every element (the domain footprint)
 subplot(2,2,4);
-h_el = min(diff(unique(round(xc * 1e6) / 1e6)));
-ix = round((xc(el) - min(xc)) / h_el) + 1;   iy = round((yc(el) - min(yc)) / h_el) + 1;
-img = nan(max(iy), max(ix));
-v = sign(num - ana) .* err_n;                              % signed, normalised error
-lin = 1e-3;   f = @(v) sign(v) .* log10(1 + abs(v) / lin); % linear inside +-0.1 %, logarithmic outside
-img(sub2ind(size(img), iy, ix)) = f(v);
-imagesc(min(xc) + [0 size(img,2)-1] * h_el, min(yc) + [0 size(img,1)-1] * h_el, img, 'AlphaData', double(~isnan(img))); set(gca, 'YDir', 'normal'); axis equal tight
+plot(xc, yc, '.', 'Color', [0.88 0.88 0.87], 'MarkerSize', 4); hold on
+lin = 1e-3;   f = @(v) sign(v) .* log10(1 + abs(v) / lin);   % linear inside +-0.1 %, logarithmic outside
+v = sign(num - ana) .* err_n;                                % signed, normalised error
+scatter(xc(el), yc(el), 36, f(v), 's', 'filled', 'MarkerEdgeColor', [0.4 0.4 0.4], 'LineWidth', 0.4);
+axis equal tight
 cmap = interp1([0 0.5 1], [0.16 0.47 0.84; 0.94 0.94 0.93; 0.89 0.29 0.28], linspace(0, 1, 256));   % blue - grey - red
 colormap(gca, cmap); caxis([-1 1] * f(0.06));
 ticks = [-0.05 -0.01 0 0.01 0.05];

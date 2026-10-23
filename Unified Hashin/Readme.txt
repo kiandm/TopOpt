@@ -207,6 +207,8 @@ These are options in `setOpts.m`, but selecting anything other than the default 
 
 The earlier folders set `crow` by hand (230, 45, 25); the default here is automatic.
 
+Example command: clear opts; opts = struct('problem', 'Lbrac60', 'agg','separated','rmin_phys',4,'ndiv',100,'maxiter',2000,'win',25,'plot',true,'save',false); main_heaviside
+
 ## Files
 
 | File | Purpose |

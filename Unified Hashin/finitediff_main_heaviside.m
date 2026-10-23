@@ -2,7 +2,7 @@
 % SAME optimiser as main_heaviside.m (there is no second copy of the optimisation loop to drift out of date).
 % Run this ONCE per formulation, e.g. after changing Hashin.m. Edit opts for the formulation to be checked.
 clear; clc; close all;
-opts = struct('maxiter', 75, 'plot', false, 'save', false);   % short run; e.g. add 'agg','smoothmax'
+opts = struct('ndiv', 50, 'maxiter', 175, 'plot', false, 'save', false);   % short run; e.g. add 'agg','smoothmax'
 main_heaviside;        % runs the optimiser. The workspace (xval, H, Hs, Ht, beta, eta, F, nHS, opts, ...) is shared with this script.
 %%
 % Finite difference checks
@@ -59,20 +59,25 @@ for i = 1:numel(steps)
     res0(i,:) = abs([cp; gp] - [c0; g0])';
     res1(i,:) = abs([cp; gp] - [c0; g0] - steps(i)*[dd_c; dd_g])';
 end
-labels = [{'c'}, arrayfun(@(k) sprintf('g_%d', k), 1:numel(g0), 'UniformOutput', false)];
+% labels = [{'c'}, arrayfun(@(k) sprintf('g_%d', k), 1:numel(g0), 'UniformOutput', false)];
 figure;
+labels = [{'c'}, arrayfun(@(k) sprintf('g_%d', k), 1:numel(g0), 'UniformOutput', false)];
+dd = [dd_c; dd_g];
+implied = min(res1 ./ (steps(:) * abs(dd(:))'), [], 1);       % smallest res1/(eps*|grad.d|): bound on the relative error of grad.d
+fprintf('implied relative error of grad.d (%s): %s\n', strjoin(labels, ' '), mat2str(implied, 2));
+figure('Position', [100 100 1400 320]);
 for j = 1:size(res1,2)
     subplot(1, size(res1,2), j);
     loglog(steps, res0(:,j), 'o-', steps, res1(:,j), 's-', steps, res0(1,j)*steps/steps(1), 'k:', steps, res1(1,j)*(steps/steps(1)).^2, 'k--');
     xlabel('\epsilon'); title(labels{j}); grid on
-    if j == 1, legend('zeroth order', 'first order', 'slope 1', 'slope 2', 'Location', 'northwest'); end
+    if j == size(res1,2), legend('zeroth order', 'first order', 'slope 1', 'slope 2', 'Location', 'southeast'); end
 end
 %% 
-h_fd = 1e-4;
+h_fd = 1e-5;
 filename = sprintf('finitediff_%s_P%g_h%g.txt', opts.agg, opts.p, h_fd);
 fileID = fopen(filename, 'w');
 
-check_elems = unique([1, numele, round(linspace(1, numele, 100))]);
+check_elems = unique([1, numele, round(linspace(1, numele, 1600))]);
 modeNames = {'ft','fc','mt','mc'};  if nHS == 1, modeNames = {'H'}; end
 
 % Element loops to calculate perturbed values
@@ -347,16 +352,15 @@ sgtitle('FD validation: abs. err')
 % title('Convergence History');
 % grid on;
 
-fd = fdParse('finitediff_smoothmax_P8.txt');
-figure; plotFDdashboard(fd, x_cen, y_cen);                % smoothmax: one mode
-fd = fdParse('finitediff_separated_P8.txt');
-figure; plotFDdashboard(fd, x_cen, y_cen, 1, 'mt');       % separated: section 1 = dg/dx, mode mt
-for s = 1:numel(fd)                                       % table for the paper
+%% Plots from the file just written (use `filename`; a hard-coded name can silently read an old file)
+fd = fdParse(filename);
+figure;
+if nHS == 1, plotFDdashboard(fd, x_cen, y_cen);              % smoothmax: one mode per element
+else,        plotFDdashboard(fd, x_cen, y_cen, 1, 'mt');     % separated: section 1 = dg/dx, pick a mode (ft, fc, mt, mc)
+end
+for s = 1:numel(fd)                                          % table for the paper
     fprintf('%-10s relL2 %.1e   max|err|/max|ana| %.1e\n', strtok(fd(s).name, ':'), ...
         norm(fd(s).abs_err)/norm(fd(s).num), max(fd(s).abs_err ./ fd(s).scale));
 end
-a = fdParse('finitediff_h1e-4.txt');  b = fdParse('finitediff_h1e-7.txt');     % view 5: same entries, two h
-figure; loglog(a(1).abs_err, b(1).abs_err, '.'); hold on; plot([1e-14 1], [1e-14 1], 'k-');
-xlabel('|error|, h = 1e-4'); ylabel('|error|, h = 1e-7');
 
 fprintf('Finite-difference script finished after %.1f s (including the optimiser run).\n', toc(tStart));
