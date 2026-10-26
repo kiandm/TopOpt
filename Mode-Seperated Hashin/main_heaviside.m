@@ -5,12 +5,12 @@
 tic
 clear; clc; 
 % close all;
-% warning off
+warning off
 addpath('Functions\')
 %% Parameters
-volfrac = 0.40; penal = 3.0; rmin_phys = 4; 
+volfrac = 0.2407; penal = 3.0; rmin_phys = 4; 
 maxiter = 1000; theta_init = pi/2;
-beta = 1; beta_max = 32; eta = 0.5;
+beta = 1; beta_max = 16; eta = 0.5;
 %Material properties composites (from Guowei Ma)
 matprop.E1=39e3;                                 % Young's modulus in fiber direction
 matprop.E2=8.4e3;                                % Young's modulus perpendicular to fiber direction

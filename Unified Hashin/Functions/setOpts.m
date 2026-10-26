@@ -26,6 +26,7 @@ d.delta_frac  = 0.05;        % smoothmax only: cubic Heaviside half-width = delt
 d.pcorr       = 'off';       % adaptive p-norm correction. 'off' (added in Phase 2)
 % ---- filters and projection ----------------------------------------------------------
 d.thetafilter = 'double';    % 'double' = pi-periodic double-angle filter ('continuity' is added in Phase 2)
+d.projection  = 'heaviside'; % 'heaviside' | 'none'.  'none': physical density = filtered density; eta and beta* below are ignored
 d.eta         = 0.5;         % Heaviside threshold
 d.beta0       = 1;           % initial Heaviside sharpness
 d.beta_max    = 32;          % final Heaviside sharpness
@@ -42,6 +43,7 @@ d.seed        = [];          % [] = none
 d.win         = 20;          % plateau window [iterations]
 d.tol_plateau = 1e-3;        % relative volume change over the window
 d.tol_g       = 1e-2;        % largest constraint value allowed at exit
+d.min_iter    = 0;           % the plateau test cannot start before this iteration (set it when projection = 'none': there is no beta schedule)
 % ---- output --------------------------------------------------------------------------
 d.plot        = true;
 d.save        = true;
@@ -62,13 +64,19 @@ oneOf(opts, 'agg',         {'separated', 'smoothmax'});
 oneOf(opts, 'gate',        {'sigmoid'}, '  (the cubic gate is added in Phase 2)');
 oneOf(opts, 'pcorr',       {'off'},     '  (the adaptive correction is added in Phase 2)');
 oneOf(opts, 'thetafilter', {'double'},  '  (the continuity filter is added in Phase 2)');
+oneOf(opts, 'projection',  {'heaviside', 'none'});
 if opts.p < 1,                          error('setOpts:p', 'opts.p must be >= 1.'); end
 if opts.beta_max < opts.beta0,          error('setOpts:beta', 'opts.beta_max must be >= opts.beta0.'); end
 if opts.maxiter < 1 || opts.maxiter ~= round(opts.maxiter), error('setOpts:maxiter', 'opts.maxiter must be a positive integer.'); end
 if opts.win >= opts.maxiter,            error('setOpts:win', 'opts.win must be smaller than opts.maxiter.'); end
+if opts.min_iter < 0 || opts.min_iter ~= round(opts.min_iter), error('setOpts:min_iter', 'opts.min_iter must be a non-negative integer.'); end
 if ~isempty(opts.crow) && opts.crow <= 0, error('setOpts:crow', 'opts.crow must be positive, or [] for automatic.'); end
 if opts.theta_pert < 0 || opts.theta_pert > pi, error('setOpts:theta_pert', 'opts.theta_pert must lie in [0, pi].'); end
 if opts.theta_pert > 0 && isempty(opts.seed), error('setOpts:seed', 'opts.theta_pert > 0 needs opts.seed, so that the run can be repeated.'); end
+if strcmp(opts.projection, 'none')                                  % a beta option that is set but has no effect must not go unnoticed
+    ignored = intersect(names, {'eta', 'beta0', 'beta_max', 'beta_factor', 'beta_step'});
+    if ~isempty(ignored), warning('setOpts:projection', 'opts.projection = "none": %s ignored.', strjoin(ignored, ', ')); end
+end
 if ~strcmp(opts.problem, 'Lbrac60') && opts.ndiv ~= 100
     error('setOpts:ndiv', 'opts.ndiv is only supported for problem "Lbrac60".');
 end

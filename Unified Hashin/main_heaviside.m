@@ -10,10 +10,15 @@ addpath('Functions')                 % forward slash: works on Windows, Linux an
 % Run with other options:  opts = struct('agg','smoothmax','p',8);  main_heaviside
 if ~exist('opts','var'), opts = struct(); end
 opts = setOpts(opts);
-fprintf('Options: agg=%s  p=%g  rmin_phys=%g  c_max=%g  beta_max=%g  maxiter=%d   (opts stays in the workspace: "clear opts" returns to the defaults)\n', ...
-        opts.agg, opts.p, opts.rmin_phys, opts.c_max, opts.beta_max, opts.maxiter);
 penal = opts.penal;  rmin_phys = opts.rmin_phys;  maxiter = opts.maxiter;  theta_init = opts.theta_init;
-beta  = opts.beta0;  beta_max  = opts.beta_max;   eta = opts.eta;
+if strcmp(opts.projection, 'heaviside')
+    beta = opts.beta0;  beta_max = opts.beta_max;      % projection on: beta continuation from beta0 to beta_max
+else
+    beta = 0;           beta_max = 0;                  % projection off: heavisideProjection(x,0,eta) returns x, so xphy = filtered density
+end
+eta = opts.eta;
+fprintf('Options: agg=%s  p=%g  rmin_phys=%g  c_max=%g  projection=%s  beta_max=%g  maxiter=%d   (opts stays in the workspace: "clear opts" returns to the defaults)\n', ...
+        opts.agg, opts.p, opts.rmin_phys, opts.c_max, opts.projection, beta_max, opts.maxiter);
 c_max = opts.c_max;                  % compliance limit F'*U
 crow  = opts.crow;                   % compliance-row scale for MMA ([] = set automatically at iteration 1)
 if ~isempty(opts.seed), rng(opts.seed); end
@@ -187,7 +192,7 @@ while ~converged && iter < maxiter
     end
     % Stopping rule: volume plateau after beta has reached beta_max, with the constraints satisfied.
     % Greyness M is logged (history column 9, results.M) but is NOT part of the rule.
-    if beta >= beta_max && ~isfinite(itb), itb = iter; end
+        if beta >= beta_max && ~isfinite(itb), itb = max(iter, opts.min_iter); end   % without projection beta >= beta_max from iteration 1
     win        = opts.win;
     stationary = (iter - itb >= win) && ...
                  (max(iterationHistory(iter-win+1:iter,3)) - min(iterationHistory(iter-win+1:iter,3))) / iterationHistory(iter,3) < opts.tol_plateau;

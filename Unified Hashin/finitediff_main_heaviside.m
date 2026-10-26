@@ -60,7 +60,6 @@ for i = 1:numel(steps)
     res1(i,:) = abs([cp; gp] - [c0; g0] - steps(i)*[dd_c; dd_g])';
 end
 % labels = [{'c'}, arrayfun(@(k) sprintf('g_%d', k), 1:numel(g0), 'UniformOutput', false)];
-figure;
 labels = [{'c'}, arrayfun(@(k) sprintf('g_%d', k), 1:numel(g0), 'UniformOutput', false)];
 dd = [dd_c; dd_g];
 implied = min(res1 ./ (steps(:) * abs(dd(:))'), [], 1);       % smallest res1/(eps*|grad.d|): bound on the relative error of grad.d
