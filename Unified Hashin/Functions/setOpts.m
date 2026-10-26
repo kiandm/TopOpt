@@ -43,8 +43,7 @@ d.seed        = [];          % [] = none
 d.win         = 20;          % plateau window [iterations]
 d.tol_plateau = 1e-3;        % relative volume change over the window
 d.tol_g       = 1e-2;        % largest constraint value allowed at exit
-d.tol_M       = 5;         % largest greyness M [%] allowed at exit. Inf = M is not part of the rule. About 5 for projection = 'heaviside'
-if ~isnumeric(opts.tol_M) || ~isscalar(opts.tol_M) || ~(opts.tol_M > 0), error('setOpts:tol_M', 'opts.tol_M must be a positive number (Inf = M is not part of the stopping rule).'); end
+d.tol_M       = inf;         % largest greyness M [%] allowed at exit. Inf = M is not part of the rule. About 5 for projection = 'heaviside'
 d.min_iter    = 0;           % the plateau test cannot start before this iteration (set it when projection = 'none': there is no beta schedule)
 % ---- output --------------------------------------------------------------------------
 d.plot        = true;
@@ -72,7 +71,9 @@ if opts.beta_max < opts.beta0,          error('setOpts:beta', 'opts.beta_max mus
 if opts.maxiter < 1 || opts.maxiter ~= round(opts.maxiter), error('setOpts:maxiter', 'opts.maxiter must be a positive integer.'); end
 if opts.win >= opts.maxiter,            error('setOpts:win', 'opts.win must be smaller than opts.maxiter.'); end
 if opts.min_iter < 0 || opts.min_iter ~= round(opts.min_iter), error('setOpts:min_iter', 'opts.min_iter must be a non-negative integer.'); end
-if ~isempty(opts.crow) && opts.crow <= 0, error('setOpts:crow', 'opts.crow must be positive, or [] for automatic.'); end
+if opts.min_iter < 0 || opts.min_iter ~= round(opts.min_iter), error('setOpts:min_iter', 'opts.min_iter must be a non-negative integer.'); end
+if opts.min_iter < 0 || opts.min_iter ~= round(opts.min_iter), error('setOpts:min_iter', 'opts.min_iter must be a non-negative integer.'); end
+if ~isnumeric(opts.tol_M) || ~isscalar(opts.tol_M) || ~(opts.tol_M > 0), error('setOpts:tol_M', 'opts.tol_M must be a positive number (Inf = M is not part of the stopping rule).'); endif ~isempty(opts.crow) && opts.crow <= 0, error('setOpts:crow', 'opts.crow must be positive, or [] for automatic.'); end
 if opts.theta_pert < 0 || opts.theta_pert > pi, error('setOpts:theta_pert', 'opts.theta_pert must lie in [0, pi].'); end
 if opts.theta_pert > 0 && isempty(opts.seed), error('setOpts:seed', 'opts.theta_pert > 0 needs opts.seed, so that the run can be repeated.'); end
 if strcmp(opts.projection, 'none')                                  % a beta option that is set but has no effect must not go unnoticed

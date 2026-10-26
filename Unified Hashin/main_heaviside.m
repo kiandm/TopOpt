@@ -205,7 +205,7 @@ if converged, exitflag = 'converged'; end
 % Measure of non-discreteness
 x = xphy(1:numele);
 % M = 100 * sum(4 * x .* (1 - x))/numele;
-disp(M) % percentage of average greyness (i.e. design is M2% grey )
+% disp(M) % percentage of average greyness (i.e. design is M2% grey )
 fprintf('Exit: %s after %d iterations | V = %.4f | c/c_max = %.4f | max(g) = %.4f | M = %.2f %%\n', exitflag, iter, v+1, c/c_max, max([g_c; g_hs]), M);
 if opts.plot
 % Plot orientation
