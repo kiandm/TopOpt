@@ -173,7 +173,7 @@ while ~converged && iter < maxiter
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
         hold on;
-        ind = find(xphy(1:numele) > 0.2); % Only show fibers where there is material
+        ind = find(xphy(1:numele) > 0.49); % Only show fibers where there is material
         theta_curr = xphy(numele+1:end);
         x_plot = [x_cen(ind) - halfL*cos(theta_curr(ind)), ...
                   x_cen(ind) + halfL*cos(theta_curr(ind)), ...
@@ -190,20 +190,21 @@ while ~converged && iter < maxiter
         beta = min(beta*opts.beta_factor, beta_max);
         fprintf('   >>> Beta updated to: %d\n',beta)
     end
-    % Stopping rule: volume plateau after beta has reached beta_max, with the constraints satisfied.
-    % Greyness M is logged (history column 9, results.M) but is NOT part of the rule.
-        if beta >= beta_max && ~isfinite(itb), itb = max(iter, opts.min_iter); end   % without projection beta >= beta_max from iteration 1
+    % Stopping rule: volume plateau after beta has reached beta_max, with the constraints satisfied and, if opts.tol_M is
+    % finite, the greyness M of the design analysed in this iteration at or below it. M is always logged (history column 9, results.M).
+    if beta >= beta_max && ~isfinite(itb), itb = max(iter, opts.min_iter); end   % without projection beta >= beta_max from iteration 1
     win        = opts.win;
     stationary = (iter - itb >= win) && ...
                  (max(iterationHistory(iter-win+1:iter,3)) - min(iterationHistory(iter-win+1:iter,3))) / iterationHistory(iter,3) < opts.tol_plateau;
     feasible   = max([g_c; g_hs]) <= opts.tol_g;
-    converged  = (beta >= beta_max) && stationary && feasible;
+    greyOK     = M <= opts.tol_M;
+    converged  = (beta >= beta_max) && stationary && feasible && greyOK;
 end
 if converged, exitflag = 'converged'; end
 %%
 % Measure of non-discreteness
 x = xphy(1:numele);
-M = 100 * sum(4 * x .* (1 - x))/numele;
+% M = 100 * sum(4 * x .* (1 - x))/numele;
 disp(M) % percentage of average greyness (i.e. design is M2% grey )
 fprintf('Exit: %s after %d iterations | V = %.4f | c/c_max = %.4f | max(g) = %.4f | M = %.2f %%\n', exitflag, iter, v+1, c/c_max, max([g_c; g_hs]), M);
 if opts.plot

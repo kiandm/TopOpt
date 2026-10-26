@@ -1,25 +1,28 @@
 function filename = saveOptResults(xphy, U, numele, numnode, gs, edofMat, coords, conn, ...
-    matprop, strength, penal, dphix_ref, dphiy_ref, freedofs, F, FailIdx, g_hs, vonMises, iter, M, filename)
-% Bundles the converged state of an optimisation run - the design, the
-% displacement field it produced, the mesh/problem data needed to recompute
-% stresses from them, and the Hashin results already computed for this design
-% - into a single struct and saves it to <filename>.mat. This lets the design
-% be re-checked against a different failure criterion later (see
-% checkTsaiWu.m) without re-running the optimisation.
+    matprop, strength, penal, dphix_ref, dphiy_ref, freedofs, F, FailIdx, g_hs, vonMises, iter, M, ...
+    opts, exitflag, history, c, V, runtime)
+% Bundles the final state of one run - the design, the displacement field it produced, the mesh/problem
+% data needed to recompute stresses from them, the Hashin results, AND everything needed to repeat the run
+% (options, git commit) - into one struct, and saves it to Results/<filename>.
 %
-% filename is optional; if omitted, a timestamped name is generated so
-% repeated runs don't overwrite each other.
+% The file name carries a timestamp first (checkTsaiWu.m picks the newest file by sorting on it), then the
+% options that matter and the commit.
 %
-% Load the result back with:  r = load(filename);
+% Load the result back with:  r = load(fullfile('Results', filename));
 
-if nargin < 21 || isempty(filename)
-    filename = sprintf('opt_results_%s.mat', datestr(now, 'yyyymmdd_HHMMSS'));
-end
+[commit, dirty] = getGitInfo();
 
-filepath = 'C:\Users\sfxz32\OneDrive - Durham University\Desktop\TopOpt\Mode-Seperated Hashin (weight minimised))\Results';
+seedtag = '';  if ~isempty(opts.seed), seedtag = sprintf('_s%d', opts.seed); end
+projtag = '';  if strcmp(opts.projection, 'none'), projtag = '_noproj'; end   % projection off: say so in the name
+filename = sprintf('opt_results_%s_%s_P%g_c%g%s%s_%s.mat', datestr(now, 'yyyymmdd_HHMMSS'), ...
+                   opts.agg, opts.p, opts.c_max, projtag, seedtag, commit);
+if dirty == 1, filename = strrep(filename, '.mat', '_dirty.mat'); end   % uncommitted edits: not reproducible from the hash
 
-results.xphy      = xphy;       % converged design: [density(1:numele); theta(numele+1:end)]
-results.U         = U;          % converged global displacement field
+filepath = fullfile(pwd, 'Results');
+if ~exist(filepath, 'dir'), mkdir(filepath); end
+
+results.xphy      = xphy;       % final design: [density(1:numele); theta(numele+1:end)]
+results.U         = U;          % displacement field of that design
 results.numele    = numele;
 results.numnode   = numnode;
 results.gs        = gs;         % Gauss point table (gauss_domain.m)
@@ -33,13 +36,22 @@ results.dphix_ref = dphix_ref;
 results.dphiy_ref = dphiy_ref;
 results.freedofs  = freedofs;
 results.F         = F;          % applied load vector
-results.FailIdx   = FailIdx;    % converged per-element, per-mode Hashin index (numele x 4)
-results.g_hs      = g_hs;       % converged Hashin p-norm constraints [g_ft;g_fc;g_mt;g_mc]
-results.vonMises  = vonMises;   % converged per-element von Mises stress
-results.iter      = iter;       % iterations taken to converge
-results.M         = M;          % final greyness measure
+results.FailIdx   = FailIdx;    % element-averaged stress-ratio index: numele x 4 (separated) or numele x 1 (smoothmax)
+results.g_hs      = g_hs;       % final p-norm constraint(s): [g_ft;g_fc;g_mt;g_mc] or g_hs
+results.vonMises  = vonMises;   % per-element von Mises stress
+results.iter      = iter;       % iterations run
+results.M         = M;          % final greyness measure [%]
+% ---- added for reproducibility and comparison ----
+results.opts      = opts;       % every option of the run (setOpts.m)
+results.exitflag  = exitflag;   % 'converged' (stopping rule met) or 'maxiter'
+results.history   = history;    % iterations x 10: [iter, c, V, change, g(1:4), M, seconds]; g padded with NaN for smoothmax
+results.c         = c;          % final compliance
+results.V         = V;          % final volume fraction
+results.runtime   = runtime;    % wall-clock seconds
+results.commit    = commit;     % git commit hash of the code
+results.dirty     = dirty;      % 1 = tracked files had uncommitted changes when the run started
+results.date      = datestr(now);
 
-fullFilePath = fullfile(filepath,filename);
-save(fullFilePath, '-struct', 'results');
-fprintf('Saved optimisation results to %s\n', filename);
+save(fullfile(filepath, filename), '-struct', 'results');
+fprintf('Saved optimisation results to %s\n', fullfile('Results', filename));
 end

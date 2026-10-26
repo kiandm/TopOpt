@@ -43,6 +43,8 @@ d.seed        = [];          % [] = none
 d.win         = 20;          % plateau window [iterations]
 d.tol_plateau = 1e-3;        % relative volume change over the window
 d.tol_g       = 1e-2;        % largest constraint value allowed at exit
+d.tol_M       = 5;         % largest greyness M [%] allowed at exit. Inf = M is not part of the rule. About 5 for projection = 'heaviside'
+if ~isnumeric(opts.tol_M) || ~isscalar(opts.tol_M) || ~(opts.tol_M > 0), error('setOpts:tol_M', 'opts.tol_M must be a positive number (Inf = M is not part of the stopping rule).'); end
 d.min_iter    = 0;           % the plateau test cannot start before this iteration (set it when projection = 'none': there is no beta schedule)
 % ---- output --------------------------------------------------------------------------
 d.plot        = true;
@@ -76,6 +78,7 @@ if opts.theta_pert > 0 && isempty(opts.seed), error('setOpts:seed', 'opts.theta_
 if strcmp(opts.projection, 'none')                                  % a beta option that is set but has no effect must not go unnoticed
     ignored = intersect(names, {'eta', 'beta0', 'beta_max', 'beta_factor', 'beta_step'});
     if ~isempty(ignored), warning('setOpts:projection', 'opts.projection = "none": %s ignored.', strjoin(ignored, ', ')); end
+    if isfinite(opts.tol_M), warning('setOpts:tol_M', 'opts.projection = "none": the density filter blurs every edge, so M may never fall to tol_M = %g (the run then ends on maxiter).', opts.tol_M); end
 end
 if ~strcmp(opts.problem, 'Lbrac60') && opts.ndiv ~= 100
     error('setOpts:ndiv', 'opts.ndiv is only supported for problem "Lbrac60".');
