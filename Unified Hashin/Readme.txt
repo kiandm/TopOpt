@@ -1,19 +1,22 @@
 # Hashin_unified
 
-Concurrent topology and fibre-orientation optimisation of a composite plate: **minimise volume subject to a compliance limit and Hashin failure constraints**, with element density and fibre angle as design variables and MMA as the optimiser (MATLAB).
+Concurrent topology and fibre-orientation optimisation of a composite plate: **minimise volume subject to a compliance limit and Hashin failure constraints**, 
+with element density and fibre angle as design variables and MMA as the optimiser (MATLAB).
 
-One code base, one optimiser (`main_heaviside.m`). The only thing that differs between the formulations being compared is the failure-constraint aggregation, selected with `opts.agg`:
+One code base, one optimiser (`main_heaviside.m`). The only thing that differs between the formulations being compared is the failure-constraint aggregation, 
+selected with `opts.agg`:
 
-| `opts.agg` | Failure constraint | Constraints returned |
-|---|---|---|
-| `'separated'` | four Hashin mode indices (fibre tension, fibre compression, matrix tension, matrix compression), **each its own p-norm** over the elements | 4 |
+| `opts.agg`    | Failure constraint                                                                                                            | Constraints returned |
+|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------|---|
+| `'separated'` | four Hashin mode indices (fibre tension, fibre compression, matrix tension, matrix compression), **each its own p-norm** over the elements       | 4 |
 | `'smoothmax'` | Dong-type: fibre and matrix indices with Heaviside-blended allowables, combined by a **smooth maximum** at each Gauss point, then **one** p-norm | 1 |
 
 Units are mm, N and MPa (compliance is in N·mm). A constraint value `g <= 0` is feasible; an index of 1 is failure.
 
 ## Quick start
 
-Requires MATLAB R2022a or newer (`pagemtimes`, `decomposition`, `clim`). Run everything from this folder, because `Results/` and `Functions/` are found relative to it. Commit your changes before a run you want to keep (see *Results*).
+Requires MATLAB R2022a or newer (`pagemtimes`, `decomposition`, `clim`). Run everything from this folder, because `Results/` and `Functions/` are found relative to it. 
+Commit your changes before a run you want to keep (see *Results*).
 
 ```matlab
 main_heaviside                                              % defaults: separated, P = 8, L-bracket
@@ -43,20 +46,20 @@ end
 
 All options, defaults and validation are in `Functions/setOpts.m`. An unknown name is an error, and so is a value that is not implemented yet.
 
-| Group | Option | Default | Meaning |
-|---|---|---|---|
-| problem | `problem` | `'Lbrac60'` | `'Lbrac60'`, `'mbb'` or `'cantilever'` (see *Test problems*) |
-| | `ndiv` | `100` | elements along the 100 mm side (`Lbrac60` only) |
-| | `rmin_phys` | `4` | density and angle filter radius [mm] |
-| | `c_max` | `1941.74` | compliance limit `F'*U` [N·mm] |
-| material model | `penal` | `3` | SIMP penalty |
-| | `q` | `0.8` | stress relaxation exponent |
-| failure constraint | `agg` | `'separated'` | `'separated'` or `'smoothmax'` |
-| | `p` | `8` | p-norm exponent **P on the linear stress-ratio index** (see below) |
-| | `gate`, `k_gate` | `'sigmoid'`, `50` | separated only: tension/compression gate and its sharpness [1/MPa] |
-| | `eps_max`, `delta_frac` | `1e-3`, `0.05` | smoothmax only: smooth-max regularisation; cubic-Heaviside half-width as a fraction of the smaller strength |
-| | `eps_sq` | `1e-12` | keeps `sqrt(I)` differentiable at zero stress |
-| | `pcorr` | `'off'` | adaptive p-norm correction (not implemented yet) |
+| Group   | Option      | Default     | Meaning                                                      |
+|---------|-------------|-------------|--------------------------------------------------------------|
+| problem | `problem`   | `'Lbrac60'` | `'Lbrac60'`, `'mbb'` or `'cantilever'` (see *Test problems*) |
+|         | `ndiv`      | `100`       | elements along the 100 mm side (`Lbrac60` only)              |
+|         | `rmin_phys` | `4`         | density and angle filter radius [mm]                         |
+|         | `c_max`     | `250`       | compliance limit `F'*U` [N·mm]                               |
+| material model | `penal` | `3`   | SIMP penalty               |
+|                | `q`     | `0.8` | stress relaxation exponent |
+| failure constraint  | `agg`                   | `'separated'`     | `'separated'` or `'smoothmax'` |
+|                     | `p`                     | `8`               | p-norm exponent **P on the linear stress-ratio index** (see below) |
+|                     | `gate`, `k_gate`        | `'sigmoid'`, `50` | separated only: tension/compression gate and its sharpness [1/MPa] |
+|                     | `eps_max`, `delta_frac` | `1e-3`, `0.05`    | smoothmax only: smooth-max regularisation; cubic-Heaviside half-width as a fraction of the smaller strength |
+|                     | `eps_sq`                | `1e-12`           | keeps `sqrt(I)` differentiable at zero stress |
+|                     | `pcorr`                 | `'off'`           | adaptive p-norm correction (not implemented yet) |
 | filters, projection | `thetafilter` | `'double'` | pi-periodic double-angle filter (`'continuity'` not implemented yet) |
 | | `eta`, `beta0`, `beta_max`, `beta_factor`, `beta_step` | `0.5`, `1`, `32`, `1.5`, `50` | Heaviside threshold; beta starts at `beta0` and is multiplied by `beta_factor` every `beta_step` iterations up to `beta_max` |
 | optimiser | `maxiter` | `1000` | iteration limit |
