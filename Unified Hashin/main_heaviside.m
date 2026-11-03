@@ -68,7 +68,7 @@ xval = [x; theta];                           % Combine design variables
 xmin_x = 1e-4 * ones(numele,1);              % Lower bound for densities
 xmax_x = 1 * ones(numele,1);                 % Upper bound for densities
 xmin_theta = (0) * ones(numele,1);           % Lower bound for fiber directions
-xmax_theta =  (2*pi) * ones(numele,1);         % Upper bound for fiber directions
+xmax_theta =  (pi) * ones(numele,1);         % Upper bound for fiber directions
 %%
 % INITIALIZE MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma

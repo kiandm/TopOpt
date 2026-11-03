@@ -16,7 +16,7 @@ nodes(:,5) = 2*nodes(:,1);          % Uy DOF = 2*id
 nel = size(elements_file, 1);
 enodes = elements_file(:, 2:5);     % take columns n1 n2 n3 n4
 edof = zeros(nel, 8);
-parfor e = 1:nel
+for e = 1:nel
     n = enodes(e,:);
     edof(e,:) = [2*n(1)-1, 2*n(1), ...
                  2*n(2)-1, 2*n(2), ...

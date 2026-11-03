@@ -1,10 +1,4 @@
-function dcf = applySensitivityFilter(dc, x, Wi, Wj, Ww, Wsum)
-% dĉi = [sumj wij * xj * dcj] / [xi * sumj wij]
-    nel = numel(x);
-    num = zeros(nel,1);
-    for k = 1:numel(Ww)
-        i = Wi(k); j = Wj(k); w = Ww(k);
-        num(i) = num(i) + w * x(j) * dc(j);
-    end
-    dcf = num ./ (x .* Wsum);
+function dcf = applySensitivityFilter(dc, x, W, WA, Ae)
+% dcf_i = A_i * sum_j w_ij x_j dc_j / ( max(x_i,1e-3) * sum_j w_ij A_j )
+    dcf = Ae .* (W * (x .* dc)) ./ (max(1e-3, x) .* WA);
 end

@@ -144,6 +144,15 @@ if isfinite(opt.tol_M), yline(ax3, opt.tol_M, '--', 'tol_M'); end
 title(ax3, '(c) greyness M of the final design [%]');
 subtitle(ax3, 'a high M means the design is far from 0/1, so its V is less comparable with the others');
 ylabel(ax3, 'M [%]');  xlabel(ax3, '\theta_0 [deg]   (fibre angle repeats every 180\circ, so 175\circ sits next to 5\circ)');
+%% Figure 2: can the runs be trusted as local optima? ----------------------------------------------------------------
+f2 = figure('Name', 'Theta sweep 2: exit diagnostics', 'Color', 'w', 'Position', [140 100 1250 780]);
+tl = tiledlayout(f2, 2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+title(tl, 'Why did each run stop, and is it feasible?');
+
+ax = nexttile(tl);  setupAxes(ax);
+h = byStatus(ax, th, T.iter, status, colors, marks, names);
+thetaAxis(ax, opt.theta_ref);  ylim(ax, [0 1.1 * opt.maxiter]);
+yline(ax, opt.maxiter, ':', 'maxiter');
 title(ax, '(a) iterations used');  ylabel(ax, 'iterations');  xlabel(ax, '\theta_0 [deg]');
 lgd = legend(ax, h(present), names(present), 'Orientation', 'horizontal', 'Box', 'off');
 lgd.Layout.Tile = 'north';
@@ -175,6 +184,14 @@ legend(ax, hp, modes, 'Location', 'best', 'Box', 'off');
 title(ax, '(d) max failure index per Hashin mode');
 subtitle(ax, 'which mode governs, and which runs actually exceed FI = 1');
 ylabel(ax, 'max FI');  xlabel(ax, '\theta_0 [deg]');
+%% Figure 3: what decides the result? --------------------------------------------------------------------------------
+f3 = figure('Name', 'Theta sweep 3: what decides the optimum', 'Color', 'w', 'Position', [180 60 1500 800]);
+tl = tiledlayout(f3, 1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+title(tl, 'What decides the final volume?  (labels = \theta_0 in degrees)');
+
+ax = nexttile(tl);  setupAxes(ax);
+h = byStatus(ax, T.C0, Vclip, status, colors, marks, names);
+text(ax, T.C0(~over), Vclip(~over), "  " + string(th(~over)), 'FontSize', 7, 'Color', [0.35 0.35 0.35], 'Clipping', 'on');
 xline(ax, opt.c_max, '--', 'C_0 = c_{max}');  ylim(ax, Vlim);
 title(ax, '(a) V against the starting design''s compliance');
 subtitle(ax, sprintf('Spearman \\rho = %.2f (all runs), %.2f (converged only)', rho_all, rho_conv));
@@ -266,7 +283,10 @@ h = gobjects(1, numel(names));
 for k = 1:numel(names)
     sel = status == k;
     if k == 1, face = colors(k, :); else, face = ax.Color; end
-    h(k) = line(ax, x(sel), y(sel), 'LineStyle', 'none', 'Marker', marks{k}, 'MarkerSize', 7, 'LineWidth', 1.3, ...
+    xs = x(sel);  ys = y(sel);
+    if isempty(xs), xs = NaN;  ys = NaN; end          % line() returns no object for empty data, which breaks the legend handles
+    %h(k) = line(ax, x(sel), y(sel), 'LineStyle', 'none', 'Marker', marks{k}, 'MarkerSize', 7, 'LineWidth', 1.3, ...
+    h(k) = line(ax, xs, ys, 'LineStyle', 'none', 'Marker', marks{k}, 'MarkerSize', 7, 'LineWidth', 1.3, ...
                 'Color', colors(k, :), 'MarkerFaceColor', face, 'DisplayName', names{k});
 end
 end

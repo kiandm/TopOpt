@@ -1,3 +1,4 @@
+% OLD CODE, HASN'T BEEN UPDATED (PROBABLY BROKEN)
 function main_FMINCON
 tic; clear; clc;
 addpath('Mains/')
