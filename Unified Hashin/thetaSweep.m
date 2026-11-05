@@ -1,6 +1,6 @@
 addpath('Functions');  if ~exist('Results','dir'), mkdir('Results'); end
 th_deg = 5:5:175;                                          % not 0 or 180: those start exactly on the angle bounds
-base   = struct('agg','separated','projection','heaviside','rmin_phys',4,'ndiv',75,'plot',false,'save',true);
+base   = struct('agg','smoothmax','projection','heaviside','rmin_phys',4,'ndiv',75,'plot',false,'save',true);
 vars = {'theta_deg','theta_rad','g_ft','g_fc','g_mt','g_mc','maxFI_ft','maxFI_fc','maxFI_mt','maxFI_mc', ...
         'g_c','c','V','M','iter','dV_win','C0','runtime'};
 n = numel(th_deg);  D = nan(n, numel(vars));  flag = repmat({'error'}, n, 1);  file = repmat({''}, n, 1);

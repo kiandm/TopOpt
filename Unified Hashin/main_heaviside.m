@@ -169,6 +169,7 @@ while ~converged && iter < maxiter
     % Plot design (x and theta)
     if opts.plot && mod(iter, 5) == 0
         figure(9); clf;
+        % if ~ishandle(9), figure(9); else, set(groot,'CurrentFigure',9); end; clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
         axis equal tight off; colormap(flipud(gray)); colorbar;
@@ -183,7 +184,7 @@ while ~converged && iter < maxiter
                   nan(length(ind),1)]';
         line(x_plot(:), y_plot(:), 'Color', [1 0 0], 'LineWidth', 0.5); % Red fibers
         title(sprintf('%s \n Iter: %d | Obj(V): %.2f | c: %.1f | max(g): %.2f', opts.agg, iter, v+1, c, max(g_hs)));
-        drawnow;
+        drawnow limitrate;
     end
     % Beta continuation block
     if mod(iter, opts.beta_step) == 0 && beta < beta_max
