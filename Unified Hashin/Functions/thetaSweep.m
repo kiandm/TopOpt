@@ -8,7 +8,10 @@ for k = 1:n
     o = base;  o.theta_init = deg2rad(th_deg(k));
     try
         r = runCase(o);
-        D(k,:)  = [th_deg(k), o.theta_init, r.g_hs, r.maxFI, r.g_c, r.c, r.V, r.M, r.iter, r.dV_win, r.C0, r.runtime];
+        % D(k,:)  = [th_deg(k), o.theta_init, r.g_hs, r.maxFI, r.g_c, r.c, r.V, r.M, r.iter, r.dV_win, r.C0, r.runtime];
+        g  = nan(1,4);  g(1:numel(r.g_hs))   = r.g_hs;     % smoothmax has ONE constraint and ONE index: they go in the *_ft columns, the other modes stay NaN
+        FI = nan(1,4);  FI(1:numel(r.maxFI)) = r.maxFI;
+        D(k,:)  = [th_deg(k), o.theta_init, g, FI, r.g_c, r.c, r.V, r.M, r.iter, r.dV_win, r.C0, r.runtime];
         flag{k} = r.exitflag;
         d = dir(fullfile('Results','opt_results_*.mat'));  [~, i] = max([d.datenum]);  file{k} = d(i).name;
     catch ME

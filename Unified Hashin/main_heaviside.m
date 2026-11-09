@@ -34,9 +34,12 @@ strength.Xc=610;                                 % Fibre direction compression (
 strength.Yt=31;                                  % Transverse direction tension (MPa)
 strength.Yc=118;                                 % Transverse direction compression (MPa)
 strength.S=72;                                   % Shear term (MPa)
+strength_opt = structfun(@(v) v*opts.str_scale, strength, 'UniformOutput', false);   % strengths seen by the optimiser (default: the real ones)
 %%
-if strcmp(opts.problem, 'Lbrac60'), probArgs = {rmin_phys, opts.ndiv}; else, probArgs = {rmin_phys}; end
+%if strcmp(opts.problem, 'Lbrac60'), probArgs = {rmin_phys, opts.ndiv}; else, probArgs = {rmin_phys}; end
+probArgs = {rmin_phys, opts.ndiv};
 [coords, conn, edofMat, numnode, numele, freedofs, F, H] = feval(['problem_setup_' opts.problem], probArgs{:});
+F = opts.load_scale * F;              % load multiplier (default 1)
 
 Hs = full(sum(H,2));      % full vector (sum of a sparse matrix is sparse)
 Ht = H';                  % transpose: used for every ADJOINT (sensitivity) filter below
@@ -69,6 +72,7 @@ xmin_x = 1e-4 * ones(numele,1);              % Lower bound for densities
 xmax_x = 1 * ones(numele,1);                 % Upper bound for densities
 xmin_theta = (0) * ones(numele,1);           % Lower bound for fiber directions
 xmax_theta =  (pi) * ones(numele,1);         % Upper bound for fiber directions
+if opts.theta_fixed, xmin_theta = theta - 1e-4; xmax_theta = theta + 1e-4; end   % frozen fibre angle: MMA may move it by 1e-4 rad at most
 %%
 % INITIALIZE MMA OPTIMIZER
 %Reference from: https://www.top3d.app/tutorials/3d-topology-optimization-using-method-of-moving-asymptotes-top3dmma
@@ -115,7 +119,7 @@ while ~converged && iter < maxiter
     % FE Analysis
     [U, K, KE0, dK] = FE_analysis(xphy, penal, numnode, numele, gs, edofMat, coords, conn, freedofs, F, matprop, dphix_ref, dphiy_ref); % ADDED DPHI
     % Hashin constraint
-    [g_hs, dgh_dx_raw, dgh_dtheta, FailIdx, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength, freedofs, dphix_ref, dphiy_ref, opts);
+    [g_hs, dgh_dx_raw, dgh_dtheta, FailIdx, vonMises] = Hashin(U, dK, KE0, xphy, penal, numele, gs, edofMat, coords, conn, matprop, strength_opt, freedofs, dphix_ref, dphiy_ref, opts);
     % Objective function and sensitivities
     [c, dc_dx_raw, dc_theta] = objective_function(U, xphy, penal, numele, gs, edofMat, coords, conn, matprop, dphix_ref, dphiy_ref); % ADDED DPHI 
     % Volume constraint and sensitivities
@@ -149,9 +153,11 @@ while ~converged && iter < maxiter
     f0val = fscale*(v+1);          % objective: volume fraction (scaled)
     fval  = [crow*g_c; g_hs];      % constraints: compliance row, then the failure constraint row(s)
     % MMA update
-    [xmma, ~, ~, ~, ~, ~, ~, ~, ~, low1, upp1] = mmasub(m, n, iter, xval, xmin,...
+    [xmma, ~, ~, lam_mma, ~, ~, ~, ~, ~, low1, upp1] = mmasub(m, n, iter, xval, xmin,...
         xmax, xold1, xold2, f0val, df0dx, fval, dfdx, low, upp, a0, a, c_MMA, d);
     low=low1;      upp=upp1;
+    if iter == 1, lamHist = zeros(maxiter, m); end
+    lamHist(iter,:) = (lam_mma(:) .* [crow; ones(nHS,1)] / fscale)';   % shadow price dV/dg_k: volume fraction saved per unit relaxation of constraint k (compliance, then the failure rows)
     xold2 = xold1; xold1 = xval; % Update old values
     xval = xmma;                 % current values of the design variables
     % %filter theta with Cartesian components

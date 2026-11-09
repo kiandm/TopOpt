@@ -1,9 +1,9 @@
-function [coords, conn, edofMat, numnode, numele, freedofs, F, W] = problem_setup_cantilever(rmin_phys)
+function [coords, conn, edofMat, numnode, numele, freedofs, F, W] = problem_setup_cantilever(rmin_phys, ndiv)
 % Cantilever beam (Fig. 7): length Lb, height Lb/2, fully clamped at
 % x=0 (both DOFs), point load at mid-height of the free (right) edge,
 % pointing in -y (0.25*Lb above it, 0.25*Lb below it).
 
-ndiv = 100;                    % elements along the length
+if nargin < 2 || isempty(ndiv), ndiv = 100; end   % elements along the length
 Lb = 100;                      % physical length
 Hb = Lb/2;                     % physical height (cantilever aspect ratio from Fig. 7)
 size_cell = Lb/ndiv;
@@ -64,8 +64,10 @@ yspac=size_cell;
 % F = sparse(2*node_load, 1, P_total, 2*numnode, 1);
 % Load distributed over 5 nodes, centred on the mid-height of the free (right) edge
 mid_y = Hb/2;
-n_node_span = 5;
-half_span = floor(n_node_span/2)*size_cell;      % = 2*size_cell either side of mid_y
+%n_node_span = 5;
+%half_span = floor(n_node_span/2)*size_cell;      % = 2*size_cell either side of mid_y
+n_node_span = 2*round(2/size_cell) + 1;           % 4 mm physical load span at any mesh (5 nodes at ndiv = 100)
+half_span = floor(n_node_span/2)*size_cell;      % = 2 mm either side of mid_y
 y_lo = mid_y - half_span;
 y_hi = mid_y + half_span;
 
@@ -94,17 +96,20 @@ coords_cells(2,:) = gs(5,:);
 dm_cells(1,1:numele)=rmin*(xspac*ones(1,numele));
 dm_cells(2,1:numele)=rmin*(yspac*ones(1,numele));
 
-W=zeros(numele,numele);
+%W=zeros(numele,numele);
+Wi=cell(numele,1); Wj=cell(numele,1); Wv=cell(numele,1);   % dense numele x numele W is 1.0 GB at ndiv = 150, 3.2 GB at 200
 for cc=1:numele
     gpos=coords_cells(:,cc);
-    [v,~]=nodes_in_support(numele, coords_cells, gpos, dm_cells);
+    [v,L]=nodes_in_support(numele, coords_cells, gpos, dm_cells);
     xi=coords_cells(:,v);
     difx=abs((gpos(1,1)-xi(1,:)));
     dify=abs((gpos(2,1)-xi(2,:)));
     dif=sqrt(difx.^2 + dify.^2);
     wij = max(rmin_phys - dif, 0) / rmin_phys;
-    W(cc,v)=wij;
+    %W(cc,v)=wij;
+    Wi{cc}=cc*ones(1,L); Wj{cc}=v; Wv{cc}=wij;
 end
 % W=W./sum(W,2);
-W=sparse(W);
+% W=sparse(W);
+W=sparse([Wi{:}], [Wj{:}], [Wv{:}], numele, numele);
 end

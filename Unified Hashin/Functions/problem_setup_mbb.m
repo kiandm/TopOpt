@@ -1,6 +1,6 @@
-function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= problem_setup_mbb(rmin_phys)
-
-nely=50;  nelx=100; 
+function [coords, conn, edofMat, numnode, numele, freedofs, F, W]= problem_setup_mbb(rmin_phys, ndiv)
+if nargin < 2 || isempty(ndiv), ndiv = 100; end   % elements along the 100 mm length (even)
+nelx=ndiv;  nely=ndiv/2; 
 Hb=50;  Lb=100; 
 size_cell = Lb/nelx;              % physical size of one element (currently 1, since Lb:=nelx)
 rmin = rmin_phys / size_cell;     % cell-count radius, used only for the candidate search below
@@ -78,7 +78,8 @@ coords_cells(2,:) = gs(5,:);
 dm_cells(1,1:numele)=rmin*(xspac*ones(1,numele));
 dm_cells(2,1:numele)=rmin*(yspac*ones(1,numele));
 
-W=zeros(numele,numele); 
+%W=zeros(numele,numele); 
+Wi=cell(numele,1); Wj=cell(numele,1); Wv=cell(numele,1);   % dense numele x numele W is 1.0 GB at ndiv = 150, 3.2 GB at 200
 for cc=1:numele
     gpos=coords_cells(:,cc); 
     [v,L]=nodes_in_support(numele, coords_cells, gpos, dm_cells);
@@ -87,11 +88,12 @@ for cc=1:numele
     dify=abs((gpos(2,1)-xi(2,:))); 
     dif=sqrt(difx.^2 + dify.^2); 
     wij = max(rmin_phys - dif, 0) / rmin_phys;
-    W(cc,v)=wij; 
     %W(cc,v)=wij; 
+    Wi{cc}=cc*ones(1,L); Wj{cc}=v; Wv{cc}=wij;
 end
 % W=W./sum(W,2); 
-W=sparse(W); 
+%W=sparse(W); 
+W=sparse([Wi{:}], [Wj{:}], [Wv{:}], numele, numele);
 
 % figure
 % patch('Faces',conn','Vertices',coords','LineWidth',1,...

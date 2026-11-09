@@ -12,6 +12,7 @@ d.problem     = 'Lbrac60';   % 'Lbrac60' | 'mbb' | 'cantilever'  (Functions/prob
 d.ndiv        = 100;         % elements along the 100 mm side (Lbrac60 only)
 d.rmin_phys   = 4;           % density / angle filter radius [mm]
 d.c_max       = 250;     % compliance limit  F'*U
+d.load_scale  = 1;           % multiplies the load vector F (scenario studies: moves a design between stiffness- and strength-governed)
 % ---- material model ------------------------------------------------------------------
 d.penal       = 3.0;         % SIMP penalty
 d.q           = 0.8;         % stress relaxation exponent
@@ -35,10 +36,12 @@ d.beta_step   = 50;          % ... every beta_step iterations
 % ---- optimiser -----------------------------------------------------------------------
 d.maxiter     = 1000;
 d.crow        = [];          % compliance-row scale for MMA. [] = automatic: norm(df0dx)/norm(dc/c_max) at iteration 1
+d.theta_fixed = false;       % true: the fibre angle is frozen at theta_init (+ the seeded perturbation); only the density is optimised
 d.fscale_coef = 0.02;        % objective scale: fscale = fscale_coef*numele
 d.theta_init  = pi/2;        % initial fibre angle [rad]
 d.theta_pert  = 0;           % [rad] seeded random perturbation of the initial angle, +-theta_pert/2 (needs a seed)
 d.seed        = [];          % [] = none
+d.str_scale   = 1;           % multiplies all five strength allowables INSIDE the optimiser (< 1 = stricter); saved-design checks use the real strengths
 % ---- stopping rule: volume plateau after beta_max is reached, with the constraints satisfied -----
 d.win         = 20;          % plateau window [iterations]
 d.tol_plateau = 1e-3;        % relative volume change over the window
@@ -75,13 +78,16 @@ if ~isnumeric(opts.tol_M) || ~isscalar(opts.tol_M) || ~(opts.tol_M > 0), error('
 if ~isempty(opts.crow) && opts.crow <= 0, error('setOpts:crow', 'opts.crow must be positive, or [] for automatic.'); end
 if opts.theta_pert < 0 || opts.theta_pert > pi, error('setOpts:theta_pert', 'opts.theta_pert must lie in [0, pi].'); end
 if opts.theta_pert > 0 && isempty(opts.seed), error('setOpts:seed', 'opts.theta_pert > 0 needs opts.seed, so that the run can be repeated.'); end
+if ~(isnumeric(opts.load_scale) && isscalar(opts.load_scale) && opts.load_scale > 0), error('setOpts:load_scale', 'opts.load_scale must be a positive number.'); end
+if ~(isnumeric(opts.str_scale) && isscalar(opts.str_scale) && opts.str_scale > 0),   error('setOpts:str_scale', 'opts.str_scale must be a positive number.'); end
+if ~(islogical(opts.theta_fixed) && isscalar(opts.theta_fixed)),                      error('setOpts:theta_fixed', 'opts.theta_fixed must be true or false.'); end
 if strcmp(opts.projection, 'none')                                  % a beta option that is set but has no effect must not go unnoticed
     ignored = intersect(names, {'eta', 'beta0', 'beta_max', 'beta_factor', 'beta_step'});
     if ~isempty(ignored), warning('setOpts:projection', 'opts.projection = "none": %s ignored.', strjoin(ignored, ', ')); end
     if isfinite(opts.tol_M), warning('setOpts:tol_M', 'opts.projection = "none": the density filter blurs every edge, so M may never fall to tol_M = %g (the run then ends on maxiter).', opts.tol_M); end
 end
-if ~strcmp(opts.problem, 'Lbrac60') && opts.ndiv ~= 100
-    error('setOpts:ndiv', 'opts.ndiv is only supported for problem "Lbrac60".');
+if ~strcmp(opts.problem, 'Lbrac60') && mod(opts.ndiv, 2) ~= 0
+    error('setOpts:ndiv', 'opts.ndiv must be even for "%s" (the height is half the length).', opts.problem);
 end
 end
 
