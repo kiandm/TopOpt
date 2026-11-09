@@ -4,6 +4,7 @@ function S = summarisePairs(ndiv, aggs, doPlot)
 % own g  = worst of the compliance constraint and the failure constraint(s) the run optimised; feasible if <= 0.02
 % gpAll / gpP99 = worst / 99th-percentile Gauss-point index of the final design, REAL strengths (> 1 means a Gauss point fails)
 % active = modes whose MMA shadow price exceeds 1e-3 (trust it only in a converged or nearly converged run)
+% exit*  = a failure-row multiplier sits at the MMA cap (c_MMA/fscale): the last subproblem was infeasible, so the run is stalled, not at a KKT point
 % norm ratio = ||smooth-max||_P / max_k ||mode k||_P on the SEPARATED design: how much stricter the single norm is on that design
 if nargin < 2 || isempty(aggs), aggs = {'separated', 'smoothmax'}; end
 if nargin < 3, doPlot = true; end
@@ -21,7 +22,7 @@ if isempty(loads), error('summarisePairs:none', 'No scenarioPairs files for ndiv
 fprintf('ndiv = %d, feasible = own g <= %.2f;  A = %s, B = %s\n', ndiv, tolfeas, aggs{1}, aggs{2});
 fprintf('%-5s | %-9s %7s %6s %6s %6s %-13s | %-9s %7s %6s %6s %6s %-13s | %7s | %s\n', 'load', 'A:exit', 'V', 'own g', 'gpP99', 'gpAll', 'active', ...
         'B:exit', 'V', 'own g', 'gpP99', 'gpAll', 'active', 'dV[%]', 'norm ratio');
-V = nan(numel(loads), 2);  feas = false(numel(loads), 2);
+V = nan(numel(loads), 2);  feas = false(numel(loads), 2);  stl = false(numel(loads), 2);
 for il = 1:numel(loads)
     txt = cell(1, 2);  ratio = NaN;
     for ia = 1:2
@@ -30,6 +31,9 @@ for il = 1:numel(loads)
         F = load(f);  r = F.r;
         own = max([r.g_c, r.g_hs]);
         V(il, ia) = r.V;  feas(il, ia) = own <= tolfeas;
+        lamcap = 1e4 / (r.opts.fscale_coef * numel(r.xphy)/2);                 % c_MMA (= 10000 in main_heaviside.m) / fscale
+        stl(il, ia) = any(r.lam(2:end) > 0.5*lamcap);
+        ex = r.exitflag;  if stl(il, ia), ex = [ex '*']; end
         if strcmp(r.opts.agg, 'separated')
             act = strjoin(modes(r.lam(2:5) > 1e-3), '+');
             P = r.opts.p;  solid = r.xphy(1:numel(r.xphy)/2) > 0.3;
@@ -37,20 +41,27 @@ for il = 1:numel(loads)
         else
             act = '';  if r.lam(2) > 1e-3, act = 'smax'; end
         end
-        txt{ia} = sprintf('%-9s %7.4f %6.3f %6.2f %6.2f %-13s', r.exitflag, r.V, own, r.gp.gpP99, r.gp.gpMaxAll, act);
+        txt{ia} = sprintf('%-10s %7.4f %6.3f %6.2f %6.2f %-13s', ex, r.V, own, r.gp.gpP99, r.gp.gpMaxAll, act);
     end
     fprintf('%-5.2f | %s | %s | %7.1f | %.3f\n', loads(il), txt{1}, txt{2}, 100 * (V(il,2) - V(il,1)) / V(il,1), ratio);
 end
-S = struct('loads', loads, 'V', V, 'feasible', feas);
-both = feas(:,1) & feas(:,2);
-if any(both)
-    fprintf('both feasible in %d of %d loads; mean dV = %.1f%% over those (dV = (V_B - V_A)/V_A)\n', nnz(both), numel(loads), mean(100 * (V(both,2) - V(both,1)) ./ V(both,1)));
-else
-    fprintf('no load where both runs are feasible\n');
-end
+%S = struct('loads', loads, 'V', V, 'feasible', feas);
+%both = feas(:,1) & feas(:,2);
+% if any(both)
+%     fprintf('both feasible in %d of %d loads; mean dV = %.1f%% over those (dV = (V_B - V_A)/V_A)\n', nnz(both), numel(loads), mean(100 * (V(both,2) - V(both,1)) ./ V(both,1)));
+% else
+%     fprintf('no load where both runs are feasible\n');
+% end
+S = struct('loads', loads, 'V', V, 'feasible', feas, 'stalled', stl);
+clean = feas(:,1) & feas(:,2) & ~stl(:,1) & ~stl(:,2);
+fprintf('clean pairs (both feasible, neither stalled): %d of %d loads', nnz(clean), numel(loads));
+for il = find(clean)', fprintf('   [load %.2f: dV = %.1f%%]', loads(il), 100 * (V(il,2) - V(il,1)) / V(il,1)); end
+fprintf('\ndV is not averaged: it depends on where each run lands relative to its own capacity limit, and maxiter runs differ by about 5%% between platforms\n');
+
 if doPlot
     figure;  hold on;  grid on
     plot(loads, V(:,1), '-o', 'DisplayName', aggs{1});  plot(loads, V(:,2), '-s', 'DisplayName', aggs{2});
+    plot(loads(stl(:,ia)), V(stl(:,ia), ia), 'k+', 'MarkerSize', 12, 'HandleVisibility', 'off');
     for ia = 1:2, plot(loads(~feas(:,ia)), V(~feas(:,ia), ia), 'kx', 'MarkerSize', 12, 'HandleVisibility', 'off'); end
     xlabel('load\_scale');  ylabel('volume fraction V');  legend('Location', 'northwest');
     title(sprintf('four-mode cantilever, ndiv = %d  (x = own constraint violated by > %.2f)', ndiv, tolfeas));
