@@ -66,7 +66,7 @@ yspac=size_cell;
 mid_y = Hb/2;
 %n_node_span = 5;
 %half_span = floor(n_node_span/2)*size_cell;      % = 2*size_cell either side of mid_y
-n_node_span = 2*round(2/size_cell) + 1;           % 4 mm physical load span at any mesh (5 nodes at ndiv = 100)
+n_node_span = max(3, 2*round(2/size_cell) + 1);   % 4 mm physical load span (5 nodes at ndiv = 100); at least 3 nodes, or very coarse meshes get NO load
 half_span = floor(n_node_span/2)*size_cell;      % = 2 mm either side of mid_y
 y_lo = mid_y - half_span;
 y_hi = mid_y + half_span;
