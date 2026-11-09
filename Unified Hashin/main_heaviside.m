@@ -168,7 +168,7 @@ while ~converged && iter < maxiter
     iterationHistory(iter, :) = [iter, c, v+1, change, g4.', M, toc(tIter)];
     % Plot design (x and theta)
     if opts.plot && mod(iter, 5) == 0
-        figure(9); clf;
+        figure(5); clf;
         % if ~ishandle(9), figure(9); else, set(groot,'CurrentFigure',9); end; clf;
         patch('Faces',conn','Vertices',coords','FaceVertexCData',xphy(1:numele),...
               'FaceColor','flat','EdgeColor','none'); 
@@ -215,7 +215,7 @@ theta_deg = mod(rad2deg(theta_rad), 180); % Extract physical angles and convert 
 x_dens = xphy(1:numele);
 theta_plot = theta_deg;
 theta_plot(x_dens <= 0.5) = NaN; % Hide void elements
-figure(10); clf;
+figure(6); clf;
 patch('Faces', conn', ...
       'Vertices', coords', ...
       'FaceVertexCData', theta_plot, ...
@@ -240,7 +240,7 @@ y_lines = [y_cen(ind) - halfL*sin(theta_rad(ind)), ... % Fixed: y_cen instead of
            nan(length(ind),1)]';
 line(x_lines(:), y_lines(:), 'Color', [0 0 0 0.5], 'LineWidth', 0.8); % Overlay fiber direction vector lines
 % Failure-index plot: one panel per mode (separated) or a single panel (smoothmax)
-figure(11); clf;
+figure(7); clf;
 modeNames = {'Fibre Tension', 'Fibre Compression', 'Matrix Tension', 'Matrix Compression'};
 if nHS == 1, modeNames = {'Smooth-max Hashin index'}; end
 mask = xphy(1:numele) < 0.3;
@@ -257,7 +257,7 @@ end
 set(gcf, 'Color', 'white');
 drawnow;
 % plot iteration convergence history
-figure(12); clf;
+figure(8); clf;
 yyaxis left
 plot(iterationHistory(1:iter, 1), iterationHistory(1:iter, 3), '-o');
 xlabel('Iteration');

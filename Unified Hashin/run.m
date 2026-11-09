@@ -1,0 +1,1 @@
+clear opts; opts = struct('agg','separated','ndiv',100, 'plot',false, 'save',true); main_heaviside
