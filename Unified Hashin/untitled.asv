@@ -1,0 +1,12 @@
+clear; clc;
+p = 8;
+agg = @(FI) sum(FI.^p)^(1/p) - 1;          % what the code does: norm of FI, then minus 1
+
+MT = 1 + [-0.5435 -0.0175 -0.6408 -0.7643];
+MC = 1 + [-0.6945 -0.7643 -0.6432 -0.0175];
+FT = 1 + [-0.0175 -0.6408 -0.7643 -0.5435];
+FC = 1 + [-0.7643 -0.6432 -0.0175 -0.6945];
+smax = 1 + [-0.0175 -0.0175 -0.0175 -0.0175];   % per-element max over the modes
+
+g_sep   = [agg(FT) agg(FC) agg(MT) agg(MC)]     % -0.0175 for each mode
+g_smax  = agg(smax)                              %  0.0714

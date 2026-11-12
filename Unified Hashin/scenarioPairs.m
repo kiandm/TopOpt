@@ -6,11 +6,11 @@
 addpath('Functions');  if ~exist('Results','dir'), mkdir('Results'); end
 %% settings (edit here)
 aggs  = {'separated', 'smoothmax'};
-loads = 0.74:0.03:0.86;                  % load_scale instances (0.74 - 0.86 was the feasible window in my ndiv = 50 runs)
+loads = 0.76:0.01:0.90;                  % load_scale instances (0.74 - 0.86 was the feasible window in my ndiv = 50 runs)
 c_rel = 10;                              % c_max = c_rel * compliance of the solid starting design
 ndiv  = 50;                              % 50 reproduces my numbers (2 mm load patch); then repeat with 100
 base  = struct('problem','cantilever','ndiv',ndiv,'rmin_phys',4,'theta_init',0,'theta_fixed',true, ...
-               'maxiter',1000,'beta_step',25,'win',20,'min_iter',0,'plot',false,'save',false);
+               'maxiter',1500,'beta_step',25,'win',20,'min_iter',0,'plot',false,'save',false);
 %% which runs
 nL = numel(loads);  nJobs = numel(aggs) * nL;
 task = str2double(getenv('SLURM_ARRAY_TASK_ID'));       % NaN when not running as a Slurm array
